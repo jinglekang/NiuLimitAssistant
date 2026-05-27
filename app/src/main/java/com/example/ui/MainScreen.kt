@@ -134,24 +134,26 @@ fun MainScreen(viewModel: NiuViewModel) {
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "安全锁",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(34.dp)
                         )
                         Column {
                             Text(
                                 text = "小牛限速助手",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
+                                lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "车辆合规限速一键恢复系统",
                                 fontSize = 11.sp,
+                                lineHeight = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
