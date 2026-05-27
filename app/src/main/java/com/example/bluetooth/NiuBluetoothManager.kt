@@ -1,6 +1,6 @@
 package com.example.bluetooth
 
-import android.annotation.SuppressLint
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -74,8 +75,14 @@ class NiuBluetoothManager(private val context: Context) {
     val CHARACTERISTIC_UUID: UUID = UUID.fromString("8ec94e32-f315-4f60-9fb8-838830daea51")
 
     private val scanCallback = object : ScanCallback() {
-        @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+
             val device = result.device
             val name = result.scanRecord?.deviceName ?: device.name ?: "Unknown Device"
             val address = device.address ?: "00:00:00:00:00:00"
@@ -107,12 +114,19 @@ class NiuBluetoothManager(private val context: Context) {
         }
     }
 
-    @SuppressLint("MissingPermission")
     fun startScan() {
         if (_isScanning.value) return
         cleanup()
 
         _scannedDevices.value = emptyList()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e(TAG, "Missing Bluetooth scan permission")
+            return
+        }
 
         val scanner = bluetoothAdapter?.bluetoothLeScanner
         if (scanner == null) {
@@ -126,25 +140,33 @@ class NiuBluetoothManager(private val context: Context) {
             mainHandler.postDelayed({
                 stopScan()
             }, 10000)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing Bluetooth scan permission", e)
+            _isScanning.value = false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start BLE scan due to exception", e)
             _isScanning.value = false
         }
     }
 
-    @SuppressLint("MissingPermission")
     fun stopScan() {
         if (!_isScanning.value) return
         _isScanning.value = false
 
+        if (!hasBluetoothScanPermission()) {
+            Log.e(TAG, "Missing Bluetooth scan permission while stopping scan")
+            return
+        }
+
         try {
             bluetoothAdapter?.bluetoothLeScanner?.stopScan(scanCallback)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing Bluetooth scan permission while stopping scan", e)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to stop BLE scan", e)
         }
     }
 
-    @SuppressLint("MissingPermission")
     fun connect(scannedDevice: ScannedBleDevice) {
         if (_connectionState.value != BLEConnectionState.DISCONNECTED) {
             cleanup()
@@ -160,6 +182,12 @@ class NiuBluetoothManager(private val context: Context) {
             return
         }
 
+        if (!hasBluetoothConnectPermission()) {
+            Log.e(TAG, "Missing Bluetooth connect permission")
+            _connectionState.value = BLEConnectionState.FAILED
+            return
+        }
+
         try {
             activeGatt = device.connectGatt(
                 context,
@@ -167,6 +195,9 @@ class NiuBluetoothManager(private val context: Context) {
                 gattCallback,
                 BluetoothDevice.TRANSPORT_LE
             )
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing Bluetooth connect permission", e)
+            _connectionState.value = BLEConnectionState.FAILED
         } catch (e: Exception) {
             Log.e(TAG, "Gatt connection exception: ${e.message}", e)
             _connectionState.value = BLEConnectionState.FAILED
@@ -184,8 +215,12 @@ class NiuBluetoothManager(private val context: Context) {
 
         activeGatt?.let { gatt ->
             try {
-                gatt.disconnect()
+                if (hasBluetoothConnectPermission()) {
+                    gatt.disconnect()
+                }
                 gatt.close()
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Missing Bluetooth connect permission while cleaning up gatt", e)
             } catch (e: Exception) {
                 Log.e(TAG, "Error cleaning up gatt", e)
             }
@@ -195,7 +230,6 @@ class NiuBluetoothManager(private val context: Context) {
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
-        @SuppressLint("MissingPermission")
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e(TAG, "GATT error: status $status")
@@ -208,7 +242,20 @@ class NiuBluetoothManager(private val context: Context) {
                 Log.d(TAG, "GATT connected")
                 _connectionState.value = BLEConnectionState.CONNECTED
                 _connectionState.value = BLEConnectionState.SERVICES_DISCOVERING
-                gatt.discoverServices()
+                if (!hasBluetoothConnectPermission()) {
+                    Log.e(TAG, "Missing Bluetooth connect permission while discovering services")
+                    _connectionState.value = BLEConnectionState.FAILED
+                    cleanup()
+                    return
+                }
+
+                try {
+                    gatt.discoverServices()
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "Missing Bluetooth connect permission while discovering services", e)
+                    _connectionState.value = BLEConnectionState.FAILED
+                    cleanup()
+                }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.d(TAG, "GATT disconnected")
                 cleanup()
@@ -250,7 +297,6 @@ class NiuBluetoothManager(private val context: Context) {
         }
     }
 
-    @SuppressLint("MissingPermission")
     fun writeSpeedLimitCode(
         hexString: String,
         isWriteNoResponse: Boolean = false,
@@ -275,6 +321,13 @@ class NiuBluetoothManager(private val context: Context) {
             return
         }
 
+        if (!hasBluetoothConnectPermission()) {
+            val errMsg = "缺少蓝牙连接权限"
+            _writeResult.value = WriteResult.Error(errMsg)
+            onLogReady(false, errMsg)
+            return
+        }
+
         val writeType = if (isWriteNoResponse) {
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         } else {
@@ -282,28 +335,47 @@ class NiuBluetoothManager(private val context: Context) {
         }
         char.writeType = writeType
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = gatt.writeCharacteristic(char, bytes, writeType)
-            if (status == 0) {
-                onLogReady(true, "指令已安全发射，等待回调响应")
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val status = gatt.writeCharacteristic(char, bytes, writeType)
+                if (status == 0) {
+                    onLogReady(true, "指令已安全发射，等待回调响应")
+                } else {
+                    val errMsg = "发送失败 (AGP Status code $status)"
+                    _writeResult.value = WriteResult.Error(errMsg)
+                    onLogReady(false, errMsg)
+                }
             } else {
-                val errMsg = "发送失败 (AGP Status code $status)"
-                _writeResult.value = WriteResult.Error(errMsg)
-                onLogReady(false, errMsg)
+                @Suppress("DEPRECATION")
+                char.value = bytes
+                @Suppress("DEPRECATION")
+                val success = gatt.writeCharacteristic(char)
+                if (success) {
+                    onLogReady(true, "指令发射就绪，等待特征写入回调")
+                } else {
+                    val errMsg = "写入失败 (低版本SDK接口拒绝)"
+                    _writeResult.value = WriteResult.Error(errMsg)
+                    onLogReady(false, errMsg)
+                }
             }
-        } else {
-            @Suppress("DEPRECATION")
-            char.value = bytes
-            @Suppress("DEPRECATION")
-            val success = gatt.writeCharacteristic(char)
-            if (success) {
-                onLogReady(true, "指令发射就绪，等待特征写入回调")
-            } else {
-                val errMsg = "写入失败 (低版本SDK接口拒绝)"
-                _writeResult.value = WriteResult.Error(errMsg)
-                onLogReady(false, errMsg)
-            }
+        } catch (e: SecurityException) {
+            val errMsg = "缺少蓝牙连接权限"
+            Log.e(TAG, errMsg, e)
+            _writeResult.value = WriteResult.Error(errMsg)
+            onLogReady(false, errMsg)
         }
+    }
+
+    private fun hasBluetoothScanPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasBluetoothConnectPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
     }
 
     private fun hexStringToByteArray(s: String): ByteArray {
