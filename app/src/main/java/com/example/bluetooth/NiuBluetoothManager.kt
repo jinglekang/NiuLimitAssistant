@@ -118,7 +118,6 @@ class NiuBluetoothManager(private val context: Context) {
 
     fun startScan() {
         if (_isScanning.value) return
-        cleanup()
 
         _scannedDevices.value = emptyList()
 
@@ -170,6 +169,7 @@ class NiuBluetoothManager(private val context: Context) {
     }
 
     fun connect(scannedDevice: ScannedBleDevice) {
+        stopScan()
         if (_connectionState.value != BLEConnectionState.DISCONNECTED) {
             cleanup()
         }
@@ -206,6 +206,45 @@ class NiuBluetoothManager(private val context: Context) {
         }
     }
 
+    fun connectByAddress(address: String, name: String) {
+        stopScan()
+        if (_connectionState.value != BLEConnectionState.DISCONNECTED) {
+            cleanup()
+        }
+
+        val device = bluetoothAdapter?.getRemoteDevice(address)
+        if (device == null) {
+            Log.e(TAG, "Cannot get remote device for address $address")
+            return
+        }
+
+        _connectedDevice.value = ScannedBleDevice(
+            name = name,
+            address = address,
+            rssi = 0,
+            device = device,
+            isNiuLink = name.startsWith("NIU Link", ignoreCase = true) || name.contains("NIU", ignoreCase = true)
+        )
+        _connectionState.value = BLEConnectionState.CONNECTING
+        _writeResult.value = WriteResult.Idle
+
+        if (!hasBluetoothConnectPermission()) {
+            Log.e(TAG, "Missing Bluetooth connect permission")
+            _connectionState.value = BLEConnectionState.FAILED
+            return
+        }
+
+        try {
+            activeGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing Bluetooth connect permission", e)
+            _connectionState.value = BLEConnectionState.FAILED
+        } catch (e: Exception) {
+            Log.e(TAG, "Gatt connection exception: ${e.message}", e)
+            _connectionState.value = BLEConnectionState.FAILED
+        }
+    }
+
     fun disconnect() {
         cleanup()
     }
@@ -214,7 +253,10 @@ class NiuBluetoothManager(private val context: Context) {
         _connectionState.value = BLEConnectionState.DISCONNECTED
         _connectedDevice.value = null
         _writeResult.value = WriteResult.Idle
+        closeGattQuietly()
+    }
 
+    private fun closeGattQuietly() {
         activeGatt?.let { gatt ->
             try {
                 if (hasBluetoothConnectPermission()) {
@@ -236,7 +278,7 @@ class NiuBluetoothManager(private val context: Context) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e(TAG, "GATT error: status $status")
                 _connectionState.value = BLEConnectionState.FAILED
-                cleanup()
+                closeGattQuietly()
                 return
             }
 
@@ -247,7 +289,7 @@ class NiuBluetoothManager(private val context: Context) {
                 if (!hasBluetoothConnectPermission()) {
                     Log.e(TAG, "Missing Bluetooth connect permission while discovering services")
                     _connectionState.value = BLEConnectionState.FAILED
-                    cleanup()
+                    closeGattQuietly()
                     return
                 }
 
@@ -256,7 +298,7 @@ class NiuBluetoothManager(private val context: Context) {
                 } catch (e: SecurityException) {
                     Log.e(TAG, "Missing Bluetooth connect permission while discovering services", e)
                     _connectionState.value = BLEConnectionState.FAILED
-                    cleanup()
+                    closeGattQuietly()
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 Log.d(TAG, "GATT disconnected")

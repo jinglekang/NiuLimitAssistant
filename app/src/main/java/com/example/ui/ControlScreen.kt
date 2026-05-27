@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -209,7 +210,7 @@ fun ControlScreen(
                                         fontSize = 15.sp
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    if (dev.isNiuLink) {
+                                    if (connectionState == BLEConnectionState.READY) {
                                         Row(
                                             modifier = Modifier
                                                 .background(
@@ -613,7 +614,8 @@ fun ControlScreen(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(

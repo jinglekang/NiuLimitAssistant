@@ -5,6 +5,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -47,9 +47,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -69,6 +66,7 @@ import com.example.ui.theme.SafeGreen
 @Composable
 fun ConnectScreen(
     viewModel: NiuViewModel,
+    isFirstLaunch: Boolean,
     onDeviceClick: (ScannedBleDevice) -> Unit
 ) {
     val context = LocalContext.current
@@ -79,7 +77,7 @@ fun ConnectScreen(
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsStateWithLifecycle()
     val lastDeviceName by viewModel.lastDeviceName.collectAsStateWithLifecycle()
 
-    var onlyShowNiu by remember { mutableStateOf(true) }
+    val onlyShowNiu by viewModel.onlyShowNiu.collectAsStateWithLifecycle()
 
     val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -106,11 +104,12 @@ fun ConnectScreen(
     }
 
     LaunchedEffect(Unit) {
+        if (!isFirstLaunch) return@LaunchedEffect
         val hasPermissions = requiredPermissions.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         if (hasPermissions) {
-            viewModel.startAutoConnectScanIfReady()
+            viewModel.tryReconnectLastDevice()
         }
     }
 
@@ -164,7 +163,11 @@ fun ConnectScreen(
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    border = BorderStroke(
+                        0.5.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
                 ) {
                     Row(
                         modifier = Modifier
@@ -203,7 +206,11 @@ fun ConnectScreen(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(
+                        0.5.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -215,12 +222,6 @@ fun ConnectScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "蓝牙搜索",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
                                 Column {
                                     Text(
                                         text = "扫描附近小牛电动车",
@@ -268,7 +269,7 @@ fun ConnectScreen(
                                     Text("停止", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 } else {
                                     Icon(
-                                        Icons.Default.Refresh,
+                                        Icons.Default.Search,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -296,7 +297,7 @@ fun ConnectScreen(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
                             TextButton(
-                                onClick = { onlyShowNiu = !onlyShowNiu },
+                                onClick = { viewModel.setOnlyShowNiu(!onlyShowNiu) },
                                 contentPadding = PaddingValues(0.dp),
                                 modifier = Modifier.height(24.dp)
                             ) {
@@ -345,6 +346,8 @@ fun ConnectScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 filteredList.take(6).forEach { dev ->
+                                    val isLastDevice =
+                                        dev.address.equals(lastDeviceAddress, ignoreCase = true)
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -410,6 +413,27 @@ fun ConnectScreen(
                                                             )
                                                         }
                                                     }
+                                                    if (isLastDevice) {
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .background(
+                                                                    SafeGreen.copy(alpha = 0.15f),
+                                                                    RoundedCornerShape(4.dp)
+                                                                )
+                                                                .padding(
+                                                                    horizontal = 4.dp,
+                                                                    vertical = 2.dp
+                                                                )
+                                                        ) {
+                                                            Text(
+                                                                "上次",
+                                                                color = SafeGreen,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                                 Spacer(modifier = Modifier.height(1.dp))
                                                 Text(
@@ -456,8 +480,12 @@ fun ConnectScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                            alpha = 0.4f
+                            alpha = 0.6f
                         )
+                    ),
+                    border = BorderStroke(
+                        0.5.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                     )
                 ) {
                     Row(

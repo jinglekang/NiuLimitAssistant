@@ -46,6 +46,13 @@ class NiuViewModel(
         MutableStateFlow(sharedPrefs.getString("last_device_name", "") ?: "")
     val lastDeviceName = _lastDeviceName.asStateFlow()
 
+    private val _onlyShowNiu = MutableStateFlow(true)
+    val onlyShowNiu = _onlyShowNiu.asStateFlow()
+
+    fun setOnlyShowNiu(value: Boolean) {
+        _onlyShowNiu.value = value
+    }
+
     val scannedDevices = bleManager.scannedDevices
     val isScanning = bleManager.isScanning
     val connectionState = bleManager.connectionState
@@ -58,22 +65,6 @@ class NiuViewModel(
         initialValue = emptyList()
     )
 
-    init {
-        viewModelScope.launch {
-            scannedDevices.collect { devices ->
-                val targetAddress = _lastDeviceAddress.value
-                if (!_isAutoConnectEnabled.value || targetAddress.isBlank()) return@collect
-                if (connectionState.value != com.example.bluetooth.BLEConnectionState.DISCONNECTED) return@collect
-
-                val targetDevice = devices.firstOrNull {
-                    it.address.equals(targetAddress, ignoreCase = true)
-                } ?: return@collect
-
-                bleManager.stopScan()
-                bleManager.connect(targetDevice)
-            }
-        }
-    }
 
     fun setHexCommand(command: String) {
         val clean =
@@ -98,9 +89,12 @@ class NiuViewModel(
         }
     }
 
-    fun startAutoConnectScanIfReady() {
+    fun tryReconnectLastDevice() {
         if (_isAutoConnectEnabled.value && _lastDeviceAddress.value.isNotBlank()) {
-            bleManager.startScan()
+            if (connectionState.value != com.example.bluetooth.BLEConnectionState.DISCONNECTED) return
+            bleManager.connectByAddress(
+                _lastDeviceAddress.value,
+                _lastDeviceName.value.ifBlank { "已保存设备" })
         }
     }
 
