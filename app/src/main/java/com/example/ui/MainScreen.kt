@@ -9,11 +9,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.bluetooth.BLEConnectionState
 import com.example.bluetooth.ScannedBleDevice
 
+private object MainRoute {
+    const val HOME = "home"
+    const val SETTINGS = "settings"
+}
+
 @Composable
 fun MainScreen(viewModel: NiuViewModel) {
+    val navController = rememberNavController()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
 
     var hasEnteredControl by remember { mutableStateOf(false) }
@@ -31,21 +40,36 @@ fun MainScreen(viewModel: NiuViewModel) {
 
     val showControl = hasEnteredControl && connectionState != BLEConnectionState.DISCONNECTED
 
-    Crossfade(
-        targetState = showControl,
-        animationSpec = tween(durationMillis = 300)
-    ) { shouldShowControl ->
-        if (shouldShowControl) {
-            ControlScreen(
-                viewModel = viewModel,
-                onDisconnectClick = { viewModel.disconnectDevice() }
-            )
-        } else {
-            ConnectScreen(
-                viewModel = viewModel,
-                onDeviceClick = { device: ScannedBleDevice ->
-                    viewModel.connectToDevice(device)
+    NavHost(
+        navController = navController,
+        startDestination = MainRoute.HOME
+    ) {
+        composable(MainRoute.HOME) {
+            Crossfade(
+                targetState = showControl,
+                animationSpec = tween(durationMillis = 300)
+            ) { shouldShowControl ->
+                if (shouldShowControl) {
+                    ControlScreen(
+                        viewModel = viewModel,
+                        onDisconnectClick = { viewModel.disconnectDevice() },
+                        onSettingsClick = { navController.navigate(MainRoute.SETTINGS) }
+                    )
+                } else {
+                    ConnectScreen(
+                        viewModel = viewModel,
+                        onSettingsClick = { navController.navigate(MainRoute.SETTINGS) },
+                        onDeviceClick = { device: ScannedBleDevice ->
+                            viewModel.connectToDevice(device)
+                        }
+                    )
                 }
+            }
+        }
+
+        composable(MainRoute.SETTINGS) {
+            SettingsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

@@ -42,8 +42,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +67,7 @@ import com.example.ui.theme.SafeGreen
 @Composable
 fun ConnectScreen(
     viewModel: NiuViewModel,
+    onSettingsClick: () -> Unit,
     onDeviceClick: (ScannedBleDevice) -> Unit
 ) {
     val context = LocalContext.current
@@ -131,34 +130,7 @@ fun ConnectScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        AppLogo()
-                        Column {
-                            Text(
-                                text = "小牛限速助手",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                lineHeight = 20.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "车辆合规限速一键恢复系统",
-                                fontSize = 11.sp,
-                                lineHeight = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-                )
-            )
+            NiuTopAppBar(onSettingsClick = onSettingsClick)
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
