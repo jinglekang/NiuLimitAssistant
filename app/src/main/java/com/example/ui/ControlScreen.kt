@@ -261,7 +261,7 @@ fun ControlScreen(
                                         strokeWidth = 2.dp
                                     )
                                     Text(
-                                        "发现底层限速服务特征组 (Discovering services)...",
+                                        "发现底层限速服务特征组...",
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.tertiary
                                     )
@@ -680,7 +680,7 @@ fun ControlScreen(
                             }
                         } else {
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 operationLogs.take(15).forEach { log ->
                                     Column(
@@ -690,7 +690,7 @@ fun ControlScreen(
                                                 MaterialTheme.colorScheme.background,
                                                 RoundedCornerShape(10.dp)
                                             )
-                                            .padding(12.dp)
+                                            .padding(8.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
@@ -742,32 +742,28 @@ fun ControlScreen(
                                         Spacer(modifier = Modifier.height(6.dp))
 
                                         Text(
-                                            text = "MAC: ${log.macAddress}",
+                                            text = log.macAddress,
                                             fontSize = 11.sp,
                                             color = MaterialTheme.colorScheme.onSurface.copy(
                                                 alpha = 0.5f
                                             )
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "写入指令: ${log.commandHex}",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(
-                                                    alpha = 0.5f
-                                                ),
-                                                fontFamily = FontFamily.Monospace
-                                            )
-                                            Text(
-                                                text = log.statusMessage,
-                                                fontSize = 10.sp,
-                                                color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
+                                        Text(
+                                            text = log.commandHex,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.5f
+                                            ),
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = log.statusMessage,
+                                            fontSize = 10.sp,
+                                            color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
+                                            fontWeight = FontWeight.Medium
+                                        )
                                     }
                                 }
                             }

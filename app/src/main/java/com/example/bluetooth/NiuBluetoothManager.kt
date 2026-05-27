@@ -69,6 +69,8 @@ class NiuBluetoothManager(private val context: Context) {
     private var activeGatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
 
+    private var pendingLogCallback: ((Boolean, String) -> Unit)? = null
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     val SERVICE_UUID: UUID = UUID.fromString("8ec94e30-f315-4f60-9fb8-838830daea51")
@@ -289,10 +291,13 @@ class NiuBluetoothManager(private val context: Context) {
             if (characteristic.uuid == CHARACTERISTIC_UUID) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     _writeResult.value = WriteResult.Success
+                    pendingLogCallback?.invoke(true, "写入成功")
                     Log.i(TAG, "Speed limit reset command written successfully!")
                 } else {
                     _writeResult.value = WriteResult.Error("写入错误: GATT status $status")
+                    pendingLogCallback?.invoke(false, "GATT写入失败: status $status")
                 }
+                pendingLogCallback = null
             }
         }
     }
@@ -339,7 +344,12 @@ class NiuBluetoothManager(private val context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val status = gatt.writeCharacteristic(char, bytes, writeType)
                 if (status == 0) {
-                    onLogReady(true, "指令已安全发射，等待回调响应")
+                    if (isWriteNoResponse) {
+                        _writeResult.value = WriteResult.Success
+                        onLogReady(true, "写入成功")
+                    } else {
+                        pendingLogCallback = onLogReady
+                    }
                 } else {
                     val errMsg = "发送失败 (AGP Status code $status)"
                     _writeResult.value = WriteResult.Error(errMsg)
@@ -351,7 +361,12 @@ class NiuBluetoothManager(private val context: Context) {
                 @Suppress("DEPRECATION")
                 val success = gatt.writeCharacteristic(char)
                 if (success) {
-                    onLogReady(true, "指令发射就绪，等待特征写入回调")
+                    if (isWriteNoResponse) {
+                        _writeResult.value = WriteResult.Success
+                        onLogReady(true, "写入成功")
+                    } else {
+                        pendingLogCallback = onLogReady
+                    }
                 } else {
                     val errMsg = "写入失败 (低版本SDK接口拒绝)"
                     _writeResult.value = WriteResult.Error(errMsg)
