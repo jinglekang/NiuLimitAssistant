@@ -47,6 +47,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.bluetooth.BLEConnectionState
 import com.example.bluetooth.ScannedBleDevice
 import com.example.ui.theme.NiuRed
 import com.example.ui.theme.SafeGreen
@@ -74,8 +78,18 @@ fun ConnectScreen(
     val isAutoConnectEnabled by viewModel.isAutoConnectEnabled.collectAsStateWithLifecycle()
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsStateWithLifecycle()
     val lastDeviceName by viewModel.lastDeviceName.collectAsStateWithLifecycle()
+    val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
+    val connectionError by viewModel.connectionError.collectAsStateWithLifecycle()
 
     val onlyShowNiu by viewModel.onlyShowNiu.collectAsStateWithLifecycle()
+    val isConnecting = connectionState == BLEConnectionState.CONNECTING
+    var connectingDeviceAddress by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(connectionState) {
+        if (!isConnecting) {
+            connectingDeviceAddress = null
+        }
+    }
 
     val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -308,6 +322,34 @@ fun ConnectScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        if (connectionState == BLEConnectionState.FAILED && !connectionError.isNullOrBlank()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.10f),
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = connectionError ?: "",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
                         val filteredList = scannedDevices.filter {
                             !onlyShowNiu || it.isNiuLink
                         }
@@ -345,6 +387,8 @@ fun ConnectScreen(
                                 filteredList.take(6).forEach { dev ->
                                     val isLastDevice =
                                         dev.address.equals(lastDeviceAddress, ignoreCase = true)
+                                    val isConnectingThisDevice =
+                                        isConnecting && dev.address == connectingDeviceAddress
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -352,7 +396,10 @@ fun ConnectScreen(
                                                 MaterialTheme.colorScheme.background,
                                                 RoundedCornerShape(12.dp)
                                             )
-                                            .clickable { onDeviceClick(dev) }
+                                            .clickable(enabled = !isConnecting) {
+                                                connectingDeviceAddress = dev.address
+                                                onDeviceClick(dev)
+                                            }
                                             .padding(12.dp)
                                             .testTag("device_item_${dev.address}"),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -412,26 +459,44 @@ fun ConnectScreen(
                                             }
                                         }
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text(
-                                                text = "${dev.rssi} dBm",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (dev.rssi > -65) SafeGreen else MaterialTheme.colorScheme.onSurface.copy(
-                                                    alpha = 0.4f
+                                        if (isConnectingThisDevice) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(16.dp),
+                                                    strokeWidth = 2.dp
                                                 )
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = "连接",
-                                                tint = MaterialTheme.colorScheme.primary.copy(
-                                                    alpha = 0.6f
-                                                ),
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                                Text(
+                                                    text = "连接中",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        } else {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${dev.rssi} dBm",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (dev.rssi > -65) SafeGreen else MaterialTheme.colorScheme.onSurface.copy(
+                                                        alpha = 0.4f
+                                                    )
+                                                )
+                                                Icon(
+                                                    imageVector = Icons.Default.PlayArrow,
+                                                    contentDescription = "连接",
+                                                    tint = MaterialTheme.colorScheme.primary.copy(
+                                                        alpha = 0.6f
+                                                    ),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }

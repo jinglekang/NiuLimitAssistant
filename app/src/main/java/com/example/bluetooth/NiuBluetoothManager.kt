@@ -75,6 +75,14 @@ class NiuBluetoothManager(private val context: Context) {
     private var pendingLogCallback: ((Boolean, String) -> Unit)? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val connectTimeoutRunnable = Runnable {
+        if (_connectionState.value == BLEConnectionState.CONNECTING) {
+            Log.e(TAG, "GATT connection timed out")
+            _connectionError.value = "连接超时，请靠近车辆后重试"
+            _connectionState.value = BLEConnectionState.FAILED
+            closeGattQuietly()
+        }
+    }
 
     val SERVICE_UUID: UUID = UUID.fromString("8ec94e30-f315-4f60-9fb8-838830daea51")
     val CHARACTERISTIC_UUID: UUID = UUID.fromString("8ec94e32-f315-4f60-9fb8-838830daea51")
@@ -181,11 +189,13 @@ class NiuBluetoothManager(private val context: Context) {
         _connectionState.value = BLEConnectionState.CONNECTING
         _connectionError.value = null
         _writeResult.value = WriteResult.Idle
+        scheduleConnectTimeout()
 
         val device = scannedDevice.device
         if (device == null) {
             _connectionError.value = "扫描设备信息已失效，无法建立蓝牙连接"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
             return
         }
 
@@ -193,6 +203,7 @@ class NiuBluetoothManager(private val context: Context) {
             Log.e(TAG, "Missing Bluetooth connect permission")
             _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
             return
         }
 
@@ -207,10 +218,12 @@ class NiuBluetoothManager(private val context: Context) {
             Log.e(TAG, "Missing Bluetooth connect permission", e)
             _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
         } catch (e: Exception) {
             Log.e(TAG, "Gatt connection exception: ${e.message}", e)
             _connectionError.value = "蓝牙连接异常: ${e.localizedMessage ?: "未知错误"}"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
         }
     }
 
@@ -238,11 +251,13 @@ class NiuBluetoothManager(private val context: Context) {
         _connectionState.value = BLEConnectionState.CONNECTING
         _connectionError.value = null
         _writeResult.value = WriteResult.Idle
+        scheduleConnectTimeout()
 
         if (!hasBluetoothConnectPermission()) {
             Log.e(TAG, "Missing Bluetooth connect permission")
             _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
             return
         }
 
@@ -252,10 +267,12 @@ class NiuBluetoothManager(private val context: Context) {
             Log.e(TAG, "Missing Bluetooth connect permission", e)
             _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
         } catch (e: Exception) {
             Log.e(TAG, "Gatt connection exception: ${e.message}", e)
             _connectionError.value = "蓝牙连接异常: ${e.localizedMessage ?: "未知错误"}"
             _connectionState.value = BLEConnectionState.FAILED
+            cancelConnectTimeout()
         }
     }
 
@@ -294,6 +311,7 @@ class NiuBluetoothManager(private val context: Context) {
     }
 
     private fun cleanup() {
+        cancelConnectTimeout()
         _connectionState.value = BLEConnectionState.DISCONNECTED
         _connectedDevice.value = null
         _connectionError.value = null
@@ -316,6 +334,15 @@ class NiuBluetoothManager(private val context: Context) {
             activeGatt = null
         }
         writeCharacteristic = null
+    }
+
+    private fun scheduleConnectTimeout() {
+        mainHandler.removeCallbacks(connectTimeoutRunnable)
+        mainHandler.postDelayed(connectTimeoutRunnable, 10000)
+    }
+
+    private fun cancelConnectTimeout() {
+        mainHandler.removeCallbacks(connectTimeoutRunnable)
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -344,12 +371,14 @@ class NiuBluetoothManager(private val context: Context) {
                 Log.e(TAG, "GATT error: status $status")
                 _connectionError.value = bluetoothGattErrorMessage(status)
                 _connectionState.value = BLEConnectionState.FAILED
+                cancelConnectTimeout()
                 closeGattQuietly()
                 return
             }
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.d(TAG, "GATT connected")
+                cancelConnectTimeout()
                 _connectionError.value = null
                 _connectionState.value = BLEConnectionState.CONNECTED
             }
