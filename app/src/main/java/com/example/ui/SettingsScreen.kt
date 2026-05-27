@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
 
-private const val SOURCE_URL = "https://github.com/matchkang/NiuLimitAssistant"
+private const val SOURCE_URL = "https://github.com/jinglekang/NiuLimitAssistant"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +75,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(14.dp)) {
                         SettingsRow(
                             title = "开源地址",
-                            value = "matchkang/NiuLimitAssistant",
+                            value = "jinglekang/NiuLimitAssistant",
                             onClick = { uriHandler.openUri(SOURCE_URL) }
                         )
                         HorizontalDivider(
