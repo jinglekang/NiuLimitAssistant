@@ -1,5 +1,6 @@
 package com.example.ui
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -45,9 +47,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -55,12 +57,16 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +79,28 @@ import com.example.bluetooth.BLEConnectionState
 import com.example.bluetooth.WriteResult
 import com.example.ui.theme.NiuRed
 import com.example.ui.theme.SafeGreen
+import org.json.JSONArray
+
+private data class CommandButton(
+    val label: String,
+    val command: String,
+    val disabled: Boolean
+)
+
+private fun loadCommandButtons(context: Context): List<CommandButton> {
+    val json = context.assets.open("preset_commands.json")
+        .bufferedReader()
+        .use { it.readText() }
+    val array = JSONArray(json)
+    return List(array.length()) { index ->
+        val item = array.getJSONObject(index)
+        CommandButton(
+            label = item.getString("label"),
+            command = item.optString("command"),
+            disabled = item.optBoolean("disabled", false)
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +108,9 @@ fun ControlScreen(
     viewModel: NiuViewModel,
     onDisconnectClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val mainCommandButtons = remember { loadCommandButtons(context) }
 
     val hexCommand by viewModel.hexCommand.collectAsStateWithLifecycle()
     val isWriteNoResponse by viewModel.isWriteNoResponse.collectAsStateWithLifecycle()
@@ -89,6 +119,8 @@ fun ControlScreen(
     val connectionError by viewModel.connectionError.collectAsStateWithLifecycle()
     val writeResult by viewModel.writeResult.collectAsStateWithLifecycle()
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
+    var selectedCommandTab by remember { mutableStateOf(0) }
+    var lastWriteOperation by remember { mutableStateOf("自定义") }
 
     LaunchedEffect(connectionState) {
         if (connectionState == BLEConnectionState.CONNECTED) {
@@ -381,131 +413,151 @@ fun ControlScreen(
                                 )
                             }
 
+                            val isWriting = writeResult == WriteResult.Writing
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            Text(
-                                text = "限速 Hex 还原十六进制代码 (必须为偶数位Hex字节)",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(
-                                value = hexCommand,
-                                onValueChange = { viewModel.setHexCommand(it) },
-                                placeholder = {
-                                    Text(
-                                        "请点击下方预设或手动输入代码",
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                    )
-                                },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Ascii,
-                                    imeAction = ImeAction.Done
-                                ),
-                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("hex_command_input"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                textStyle = LocalTextStyle.current.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "官方标准指令预设 (可直接点击一键套用)",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            TabRow(
+                                selectedTabIndex = selectedCommandTab,
+                                containerColor = MaterialTheme.colorScheme.background,
+                                contentColor = MaterialTheme.colorScheme.primary
                             ) {
-                                val presets = listOf(
-                                    Pair("6784568726353113346130602277419687263531", "国内还原"),
-                                    Pair("6784855911124499612592282354227987263531", "国外还原")
-                                )
-                                presets.forEach { (code, label) ->
-                                    val isSelected = hexCommand.replace(" ", "") == code
-                                    SuggestionChip(
-                                        onClick = { viewModel.setHexCommand(code) },
-                                        label = {
-                                            Text(
-                                                label,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        },
-                                        colors = SuggestionChipDefaults.suggestionChipColors(
-                                            containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(
-                                                alpha = 0.15f
-                                            ) else Color.Transparent,
-                                            labelColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        ),
-                                        border = SuggestionChipDefaults.suggestionChipBorder(
-                                            enabled = true,
-                                            borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(
-                                                alpha = 0.3f
-                                            )
+                                Tab(
+                                    selected = selectedCommandTab == 0,
+                                    onClick = { selectedCommandTab = 0 },
+                                    text = {
+                                        Text(
+                                            "预设",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
                                         )
-                                    )
-                                }
+                                    }
+                                )
+                                Tab(
+                                    selected = selectedCommandTab == 1,
+                                    onClick = { selectedCommandTab = 1 },
+                                    text = {
+                                        Text(
+                                            "自定义",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                )
                             }
 
-                            Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            val isWriting = writeResult == WriteResult.Writing
-                            val cleanHex = hexCommand.replace(" ", "").replace(":", "")
-                            val canWrite = cleanHex.isNotBlank() && cleanHex.length % 2 == 0
-                            Button(
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    viewModel.restoreSpeedLimit()
-                                },
-                                enabled = !isWriting && canWrite,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .testTag("restore_speed_button"),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = NiuRed,
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                if (isWriting) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = Color.White,
-                                        strokeWidth = 2.5.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text("指令安全发射中...", fontWeight = FontWeight.Bold)
-                                } else {
-                                    Icon(
-                                        Icons.Default.Done,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        "一键恢复官方限速 (25km/h)",
+                            if (selectedCommandTab == 0) {
+                                mainCommandButtons.chunked(2).forEach { rowItems ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        rowItems.forEach { item ->
+                                            Button(
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    lastWriteOperation = item.label
+                                                    viewModel.writeFixedCommand(
+                                                        item.label,
+                                                        item.command
+                                                    )
+                                                },
+                                                enabled = !isWriting &&
+                                                    !item.disabled &&
+                                                    item.command.isNotBlank(),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(42.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = MaterialTheme.colorScheme.primary,
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    item.label,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = hexCommand,
+                                    onValueChange = { viewModel.setHexCommand(it) },
+                                    placeholder = {
+                                        Text(
+                                            "输入自定义Hex代码",
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                        )
+                                    },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Ascii,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("hex_command_input"),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    shape = RoundedCornerShape(10.dp),
+                                    textStyle = LocalTextStyle.current.copy(
+                                        fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp
                                     )
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                val cleanHex = hexCommand.replace(" ", "").replace(":", "")
+                                val canWrite = cleanHex.isNotBlank() && cleanHex.length % 2 == 0
+                                Button(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        lastWriteOperation = "自定义"
+                                        viewModel.writeCustomCommand()
+                                    },
+                                    enabled = !isWriting && canWrite,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("restore_speed_button"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = NiuRed,
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    if (isWriting) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            color = Color.White,
+                                            strokeWidth = 2.5.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text("指令安全发射中...", fontWeight = FontWeight.Bold)
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Done,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "一键写入",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
                                 }
                             }
 
@@ -566,15 +618,15 @@ fun ControlScreen(
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Column {
                                                     Text(
-                                                        "限速控制写入成功！",
+                                                        "已写入【$lastWriteOperation】",
                                                         fontWeight = FontWeight.Bold,
                                                         color = SafeGreen,
                                                         fontSize = 14.sp
                                                     )
                                                     Text(
-                                                        "车辆非法改装已被还原。请重启电动车电源验证速限面板是否锁定在25km/h。",
+                                                        "如果未生效，请重新启动车辆",
                                                         fontSize = 11.sp,
-                                                        color = SafeGreen.copy(alpha = 0.95f)
+                                                        color = SafeGreen.copy(alpha = 0.9f)
                                                     )
                                                 }
                                             }
@@ -631,7 +683,10 @@ fun ControlScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                    border = BorderStroke(
+                        0.5.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -708,38 +763,38 @@ fun ControlScreen(
                                                 MaterialTheme.colorScheme.background,
                                                 RoundedCornerShape(10.dp)
                                             )
-                                            .padding(8.dp)
+                                            .padding(10.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                            verticalAlignment = Alignment.Top
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                modifier = Modifier.weight(1f)
                                             ) {
-                                                Text(
-                                                    text = log.deviceName,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 13.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
                                                 Box(
                                                     modifier = Modifier
+                                                        .size(8.dp)
                                                         .background(
-                                                            if (log.isSuccess) SafeGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.error.copy(
-                                                                alpha = 0.15f
-                                                            ),
-                                                            RoundedCornerShape(4.dp)
+                                                            if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
+                                                            CircleShape
                                                         )
-                                                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                                                ) {
+                                                )
+                                                Column {
                                                     Text(
-                                                        text = if (log.isSuccess) "成功" else "失败",
+                                                        text = log.operationType,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = log.statusMessage,
+                                                        fontSize = 10.sp,
                                                         color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold
+                                                        fontWeight = FontWeight.Medium
                                                     )
                                                 }
                                             }
@@ -751,36 +806,42 @@ fun ControlScreen(
                                                 )
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        HorizontalDivider(
-                                            color = MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.05f
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = log.deviceName,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
                                             )
-                                        )
+                                            Text(
+                                                text = log.macAddress,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f)
+                                            )
+                                        }
+
                                         Spacer(modifier = Modifier.height(6.dp))
 
                                         Text(
-                                            text = log.macAddress,
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.5f
-                                            )
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
                                             text = log.commandHex,
-                                            fontSize = 11.sp,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                                                    RoundedCornerShape(6.dp)
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                            fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurface.copy(
-                                                alpha = 0.5f
+                                                alpha = 0.52f
                                             ),
                                             fontFamily = FontFamily.Monospace
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = log.statusMessage,
-                                            fontSize = 10.sp,
-                                            color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
-                                            fontWeight = FontWeight.Medium
                                         )
                                     }
                                 }

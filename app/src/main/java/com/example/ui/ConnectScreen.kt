@@ -50,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -382,58 +381,27 @@ fun ConnectScreen(
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
-                                            Column {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = dev.name,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                val deviceTags = listOfNotNull(
+                                                    if (dev.isNiuLink) "NIU车辆" else null,
+                                                    if (isLastDevice) "上次连接" else null
+                                                )
+                                                if (deviceTags.isNotEmpty()) {
                                                     Text(
-                                                        text = dev.name,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 14.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface
+                                                        text = deviceTags.joinToString(" · "),
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = if (dev.isNiuLink) NiuRed else SafeGreen
                                                     )
-                                                    if (dev.isNiuLink) {
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .background(
-                                                                    NiuRed,
-                                                                    RoundedCornerShape(4.dp)
-                                                                )
-                                                                .padding(
-                                                                    horizontal = 4.dp,
-                                                                    vertical = 2.dp
-                                                                )
-                                                        ) {
-                                                            Text(
-                                                                "NIU Link",
-                                                                color = Color.White,
-                                                                fontSize = 8.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                        }
-                                                    }
-                                                    if (isLastDevice) {
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .background(
-                                                                    SafeGreen.copy(alpha = 0.15f),
-                                                                    RoundedCornerShape(4.dp)
-                                                                )
-                                                                .padding(
-                                                                    horizontal = 4.dp,
-                                                                    vertical = 2.dp
-                                                                )
-                                                        ) {
-                                                            Text(
-                                                                "上次",
-                                                                color = SafeGreen,
-                                                                fontSize = 9.sp,
-                                                                fontWeight = FontWeight.Bold
-                                                            )
-                                                        }
-                                                    }
+                                                    Spacer(modifier = Modifier.height(1.dp))
                                                 }
-                                                Spacer(modifier = Modifier.height(1.dp))
                                                 Text(
                                                     text = "MAC: " + dev.address,
                                                     fontSize = 11.sp,

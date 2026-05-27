@@ -44,9 +44,21 @@ $base64 = Get-Content -Raw -Path debug.keystore.base64
 
 #### Release 签名
 默认读取根目录的 `release.jks`。也可通过环境变量配置：
-- `KEYSTORE_PATH`
-- `STORE_PASSWORD`
-- `KEY_PASSWORD`
+
+- `KEYSTORE_PATH`: keystore 文件路径；不配置时默认使用项目根目录的 `release.jks`
+- `STORE_PASSWORD`: keystore 密码
+- `KEY_PASSWORD`: release 签名 key 密码
+- `KEY_ALIAS`: release 签名 key alias
+
+PowerShell 示例：
+
+```powershell
+$env:KEYSTORE_PATH="D:\path\to\release.jks"
+$env:STORE_PASSWORD="PASSWORD"
+$env:KEY_PASSWORD="PASSWORD"
+$env:KEY_ALIAS="RELEASE"
+.\gradlew.bat assembleRelease
+```
 
 ### 3. 编译与运行
 你可以直接通过 Android Studio 的 **Run** 按钮运行，也可以使用命令行：

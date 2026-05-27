@@ -12,6 +12,7 @@ data class OperationLog(
     val deviceName: String,
     val macAddress: String,
     val timestamp: Long = System.currentTimeMillis(),
+    val operationType: String,
     val commandHex: String,
     val isSuccess: Boolean,
     val statusMessage: String

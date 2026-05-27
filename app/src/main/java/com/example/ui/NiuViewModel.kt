@@ -133,12 +133,24 @@ class NiuViewModel(
         bleManager.disconnect()
     }
 
-    fun restoreSpeedLimit() {
-        val currentDevice = connectedDevice.value ?: return
+    fun writeCustomCommand() {
         val currentCommand = _hexCommand.value.replace(" ", "").replace(":", "")
+        writeCommand(currentCommand, _hexCommand.value, "自定义")
+    }
 
+    fun writeFixedCommand(operationType: String, command: String) {
+        val currentCommand = command.replace(" ", "").replace(":", "")
+        writeCommand(currentCommand, command, operationType)
+    }
+
+    private fun writeCommand(
+        commandToWrite: String,
+        commandForLog: String,
+        operationType: String
+    ) {
+        val currentDevice = connectedDevice.value ?: return
         bleManager.writeSpeedLimitCode(
-            currentCommand,
+            commandToWrite,
             _isWriteNoResponse.value
         ) { success, details ->
             viewModelScope.launch {
@@ -146,7 +158,8 @@ class NiuViewModel(
                     OperationLog(
                         deviceName = currentDevice.name,
                         macAddress = currentDevice.address,
-                        commandHex = _hexCommand.value,
+                        operationType = operationType,
+                        commandHex = commandForLog,
                         isSuccess = success,
                         statusMessage = details
                     )
