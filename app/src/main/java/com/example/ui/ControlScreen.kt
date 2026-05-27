@@ -54,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,8 +87,15 @@ fun ControlScreen(
     val isWriteNoResponse by viewModel.isWriteNoResponse.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectedDevice by viewModel.connectedDevice.collectAsStateWithLifecycle()
+    val connectionError by viewModel.connectionError.collectAsStateWithLifecycle()
     val writeResult by viewModel.writeResult.collectAsStateWithLifecycle()
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
+
+    LaunchedEffect(connectionState) {
+        if (connectionState == BLEConnectionState.CONNECTED) {
+            viewModel.discoverConnectedDeviceServices()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -256,6 +264,18 @@ fun ControlScreen(
                                     )
                                 }
 
+                                BLEConnectionState.CONNECTED -> {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        "蓝牙连接成功，正在校验服务特征...",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
                                 BLEConnectionState.SERVICES_DISCOVERING -> {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(16.dp),
@@ -291,7 +311,7 @@ fun ControlScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        "蓝牙握手失败，特征校验不成功",
+                                        connectionError ?: "蓝牙握手失败，特征校验不成功",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.error
@@ -454,12 +474,14 @@ fun ControlScreen(
                             Spacer(modifier = Modifier.height(18.dp))
 
                             val isWriting = writeResult == WriteResult.Writing
+                            val cleanHex = hexCommand.replace(" ", "").replace(":", "")
+                            val canWrite = cleanHex.isNotBlank() && cleanHex.length % 2 == 0
                             Button(
                                 onClick = {
                                     focusManager.clearFocus()
                                     viewModel.restoreSpeedLimit()
                                 },
-                                enabled = !isWriting && hexCommand.isNotBlank(),
+                                enabled = !isWriting && canWrite,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)

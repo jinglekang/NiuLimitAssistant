@@ -63,6 +63,9 @@ class NiuBluetoothManager(private val context: Context) {
     private val _connectedDevice = MutableStateFlow<ScannedBleDevice?>(null)
     val connectedDevice = _connectedDevice.asStateFlow()
 
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError = _connectionError.asStateFlow()
+
     private val _writeResult = MutableStateFlow<WriteResult>(WriteResult.Idle)
     val writeResult = _writeResult.asStateFlow()
 
@@ -176,16 +179,19 @@ class NiuBluetoothManager(private val context: Context) {
 
         _connectedDevice.value = scannedDevice
         _connectionState.value = BLEConnectionState.CONNECTING
+        _connectionError.value = null
         _writeResult.value = WriteResult.Idle
 
         val device = scannedDevice.device
         if (device == null) {
+            _connectionError.value = "扫描设备信息已失效，无法建立蓝牙连接"
             _connectionState.value = BLEConnectionState.FAILED
             return
         }
 
         if (!hasBluetoothConnectPermission()) {
             Log.e(TAG, "Missing Bluetooth connect permission")
+            _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
             return
         }
@@ -199,9 +205,11 @@ class NiuBluetoothManager(private val context: Context) {
             )
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing Bluetooth connect permission", e)
+            _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
         } catch (e: Exception) {
             Log.e(TAG, "Gatt connection exception: ${e.message}", e)
+            _connectionError.value = "蓝牙连接异常: ${e.localizedMessage ?: "未知错误"}"
             _connectionState.value = BLEConnectionState.FAILED
         }
     }
@@ -215,6 +223,8 @@ class NiuBluetoothManager(private val context: Context) {
         val device = bluetoothAdapter?.getRemoteDevice(address)
         if (device == null) {
             Log.e(TAG, "Cannot get remote device for address $address")
+            _connectionError.value = "无法通过保存的地址找到设备: $address"
+            _connectionState.value = BLEConnectionState.FAILED
             return
         }
 
@@ -226,10 +236,12 @@ class NiuBluetoothManager(private val context: Context) {
             isNiuLink = name.startsWith("NIU Link", ignoreCase = true) || name.contains("NIU", ignoreCase = true)
         )
         _connectionState.value = BLEConnectionState.CONNECTING
+        _connectionError.value = null
         _writeResult.value = WriteResult.Idle
 
         if (!hasBluetoothConnectPermission()) {
             Log.e(TAG, "Missing Bluetooth connect permission")
+            _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
             return
         }
@@ -238,9 +250,11 @@ class NiuBluetoothManager(private val context: Context) {
             activeGatt = device.connectGatt(context, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
         } catch (e: SecurityException) {
             Log.e(TAG, "Missing Bluetooth connect permission", e)
+            _connectionError.value = "缺少蓝牙连接权限"
             _connectionState.value = BLEConnectionState.FAILED
         } catch (e: Exception) {
             Log.e(TAG, "Gatt connection exception: ${e.message}", e)
+            _connectionError.value = "蓝牙连接异常: ${e.localizedMessage ?: "未知错误"}"
             _connectionState.value = BLEConnectionState.FAILED
         }
     }
@@ -249,9 +263,40 @@ class NiuBluetoothManager(private val context: Context) {
         cleanup()
     }
 
+    fun discoverServices() {
+        val gatt = activeGatt
+        if (gatt == null) {
+            _connectionError.value = "蓝牙连接未建立，无法校验服务特征"
+            _connectionState.value = BLEConnectionState.FAILED
+            return
+        }
+
+        if (!hasBluetoothConnectPermission()) {
+            Log.e(TAG, "Missing Bluetooth connect permission while discovering services")
+            _connectionError.value = "缺少蓝牙连接权限，无法校验服务特征"
+            _connectionState.value = BLEConnectionState.FAILED
+            return
+        }
+
+        try {
+            _connectionError.value = null
+            _connectionState.value = BLEConnectionState.SERVICES_DISCOVERING
+            gatt.discoverServices()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing Bluetooth connect permission while discovering services", e)
+            _connectionError.value = "缺少蓝牙连接权限，无法校验服务特征"
+            _connectionState.value = BLEConnectionState.FAILED
+        } catch (e: Exception) {
+            Log.e(TAG, "Service discovery exception: ${e.message}", e)
+            _connectionError.value = "服务发现异常: ${e.localizedMessage ?: "未知错误"}"
+            _connectionState.value = BLEConnectionState.FAILED
+        }
+    }
+
     private fun cleanup() {
         _connectionState.value = BLEConnectionState.DISCONNECTED
         _connectedDevice.value = null
+        _connectionError.value = null
         _writeResult.value = WriteResult.Idle
         closeGattQuietly()
     }
@@ -275,8 +320,29 @@ class NiuBluetoothManager(private val context: Context) {
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d(TAG, "GATT disconnected with status $status")
+                when (_connectionState.value) {
+                    BLEConnectionState.FAILED -> {
+                        closeGattQuietly()
+                    }
+
+                    BLEConnectionState.READY -> {
+                        _connectionError.value = "蓝牙连接已断开，请重新连接"
+                        _connectionState.value = BLEConnectionState.FAILED
+                        closeGattQuietly()
+                    }
+
+                    else -> {
+                        cleanup()
+                    }
+                }
+                return
+            }
+
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.e(TAG, "GATT error: status $status")
+                _connectionError.value = bluetoothGattErrorMessage(status)
                 _connectionState.value = BLEConnectionState.FAILED
                 closeGattQuietly()
                 return
@@ -284,25 +350,8 @@ class NiuBluetoothManager(private val context: Context) {
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 Log.d(TAG, "GATT connected")
+                _connectionError.value = null
                 _connectionState.value = BLEConnectionState.CONNECTED
-                _connectionState.value = BLEConnectionState.SERVICES_DISCOVERING
-                if (!hasBluetoothConnectPermission()) {
-                    Log.e(TAG, "Missing Bluetooth connect permission while discovering services")
-                    _connectionState.value = BLEConnectionState.FAILED
-                    closeGattQuietly()
-                    return
-                }
-
-                try {
-                    gatt.discoverServices()
-                } catch (e: SecurityException) {
-                    Log.e(TAG, "Missing Bluetooth connect permission while discovering services", e)
-                    _connectionState.value = BLEConnectionState.FAILED
-                    closeGattQuietly()
-                }
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.d(TAG, "GATT disconnected")
-                cleanup()
             }
         }
 
@@ -313,14 +362,17 @@ class NiuBluetoothManager(private val context: Context) {
 
                 if (characteristic != null) {
                     writeCharacteristic = characteristic
+                    _connectionError.value = null
                     _connectionState.value = BLEConnectionState.READY
                     Log.d(TAG, "Target Service and Characteristic found!")
                 } else {
                     Log.e(TAG, "Target characteristic or service not found!")
+                    _connectionError.value = "当前车辆不支持此功能"
                     _connectionState.value = BLEConnectionState.FAILED
                 }
             } else {
                 Log.e(TAG, "Service discovery failed with status $status")
+                _connectionError.value = "服务发现失败，状态码: $status"
                 _connectionState.value = BLEConnectionState.FAILED
             }
         }
@@ -433,6 +485,16 @@ class NiuBluetoothManager(private val context: Context) {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) ==
             PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun bluetoothGattErrorMessage(status: Int): String {
+        return when (status) {
+            8 -> "蓝牙连接超时，请靠近车辆后重试"
+            19 -> "蓝牙连接已由车辆端断开"
+            22 -> "蓝牙连接已由手机端断开"
+            133 -> "蓝牙系统连接异常，请关闭蓝牙后重试"
+            else -> "蓝牙连接失败，请重新连接"
+        }
     }
 
     private fun hexStringToByteArray(s: String): ByteArray {

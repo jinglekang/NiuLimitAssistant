@@ -66,7 +66,6 @@ import com.example.ui.theme.SafeGreen
 @Composable
 fun ConnectScreen(
     viewModel: NiuViewModel,
-    isFirstLaunch: Boolean,
     onDeviceClick: (ScannedBleDevice) -> Unit
 ) {
     val context = LocalContext.current
@@ -94,23 +93,27 @@ fun ConnectScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        val allGranted = results.values.all { it }
+        val allGranted = requiredPermissions.all { results[it] == true }
         if (allGranted) {
-            viewModel.startScanning()
-            Toast.makeText(context, "蓝牙权限已获取，开始扫描", Toast.LENGTH_SHORT).show()
+            val reconnectStarted = viewModel.tryReconnectLastDeviceOnce(true)
+            if (!reconnectStarted) {
+                viewModel.startScanning()
+            }
+            Toast.makeText(
+                context,
+                if (reconnectStarted) "蓝牙权限已获取，正在连接上次设备" else "蓝牙权限已获取，开始扫描",
+                Toast.LENGTH_SHORT
+            ).show()
         } else {
             Toast.makeText(context, "需要蓝牙权限以扫描附近的电动车", Toast.LENGTH_LONG).show()
         }
     }
 
     LaunchedEffect(Unit) {
-        if (!isFirstLaunch) return@LaunchedEffect
         val hasPermissions = requiredPermissions.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
-        if (hasPermissions) {
-            viewModel.tryReconnectLastDevice()
-        }
+        viewModel.tryReconnectLastDeviceOnce(hasPermissions)
     }
 
     Scaffold(

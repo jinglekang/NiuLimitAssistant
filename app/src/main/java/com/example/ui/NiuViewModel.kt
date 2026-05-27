@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.bluetooth.NiuBluetoothManager
+import com.example.bluetooth.BLEConnectionState
 import com.example.bluetooth.ScannedBleDevice
 import com.example.data.OperationLog
 import com.example.data.OperationLogRepository
@@ -49,6 +50,8 @@ class NiuViewModel(
     private val _onlyShowNiu = MutableStateFlow(true)
     val onlyShowNiu = _onlyShowNiu.asStateFlow()
 
+    private var autoReconnectAttempted = false
+
     fun setOnlyShowNiu(value: Boolean) {
         _onlyShowNiu.value = value
     }
@@ -57,6 +60,7 @@ class NiuViewModel(
     val isScanning = bleManager.isScanning
     val connectionState = bleManager.connectionState
     val connectedDevice = bleManager.connectedDevice
+    val connectionError = bleManager.connectionError
     val writeResult = bleManager.writeResult
 
     val operationLogs = repository.allLogs.stateIn(
@@ -89,13 +93,18 @@ class NiuViewModel(
         }
     }
 
-    fun tryReconnectLastDevice() {
-        if (_isAutoConnectEnabled.value && _lastDeviceAddress.value.isNotBlank()) {
-            if (connectionState.value != com.example.bluetooth.BLEConnectionState.DISCONNECTED) return
-            bleManager.connectByAddress(
-                _lastDeviceAddress.value,
-                _lastDeviceName.value.ifBlank { "已保存设备" })
-        }
+    fun tryReconnectLastDeviceOnce(hasRequiredPermissions: Boolean): Boolean {
+        if (!hasRequiredPermissions) return false
+        if (autoReconnectAttempted) return false
+        autoReconnectAttempted = true
+        if (!_isAutoConnectEnabled.value || _lastDeviceAddress.value.isBlank()) return false
+        if (connectionState.value != BLEConnectionState.DISCONNECTED) return false
+
+        bleManager.connectByAddress(
+            _lastDeviceAddress.value,
+            _lastDeviceName.value.ifBlank { "已保存设备" }
+        )
+        return true
     }
 
     fun startScanning() {
@@ -114,6 +123,10 @@ class NiuViewModel(
             putString("last_device_name", device.name)
         }
         bleManager.connect(device)
+    }
+
+    fun discoverConnectedDeviceServices() {
+        bleManager.discoverServices()
     }
 
     fun disconnectDevice() {

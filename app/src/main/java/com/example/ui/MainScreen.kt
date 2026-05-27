@@ -16,21 +16,26 @@ import com.example.bluetooth.ScannedBleDevice
 fun MainScreen(viewModel: NiuViewModel) {
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
 
-    var everConnected by remember { mutableStateOf(false) }
+    var hasEnteredControl by remember { mutableStateOf(false) }
     LaunchedEffect(connectionState) {
-        if (connectionState != BLEConnectionState.DISCONNECTED) {
-            everConnected = true
+        when (connectionState) {
+            BLEConnectionState.CONNECTED,
+            BLEConnectionState.SERVICES_DISCOVERING,
+            BLEConnectionState.READY -> hasEnteredControl = true
+
+            BLEConnectionState.DISCONNECTED -> hasEnteredControl = false
+
+            else -> Unit
         }
     }
 
-    val isFirstLaunch = !everConnected
-    val isConnected = connectionState != BLEConnectionState.DISCONNECTED
+    val showControl = hasEnteredControl && connectionState != BLEConnectionState.DISCONNECTED
 
     Crossfade(
-        targetState = isConnected,
+        targetState = showControl,
         animationSpec = tween(durationMillis = 300)
-    ) { connected ->
-        if (connected) {
+    ) { shouldShowControl ->
+        if (shouldShowControl) {
             ControlScreen(
                 viewModel = viewModel,
                 onDisconnectClick = { viewModel.disconnectDevice() }
@@ -38,7 +43,6 @@ fun MainScreen(viewModel: NiuViewModel) {
         } else {
             ConnectScreen(
                 viewModel = viewModel,
-                isFirstLaunch = isFirstLaunch,
                 onDeviceClick = { device: ScannedBleDevice ->
                     viewModel.connectToDevice(device)
                 }
