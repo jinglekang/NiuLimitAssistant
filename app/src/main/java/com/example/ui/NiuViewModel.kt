@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -15,13 +16,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class NiuViewModel(
-    private val context: Context,
+    context: Context,
     private val repository: OperationLogRepository
 ) : ViewModel() {
 
-    val bleManager = NiuBluetoothManager(context)
+    val bleManager = NiuBluetoothManager(context.applicationContext)
 
-    private val sharedPrefs = context.getSharedPreferences("SpeedLimitPrefs", Context.MODE_PRIVATE)
+    private val sharedPrefs =
+        context.applicationContext.getSharedPreferences("SpeedLimitPrefs", Context.MODE_PRIVATE)
 
     private val _hexCommand = MutableStateFlow(
         sharedPrefs.getString("hex_command", "5A0C010100000000") ?: "5A0C010100000000"
@@ -77,17 +79,23 @@ class NiuViewModel(
         val clean =
             command.uppercase().filter { it.isDigit() || it in 'A'..'F' || it == ' ' || it == ':' }
         _hexCommand.value = clean
-        sharedPrefs.edit().putString("hex_command", clean).apply()
+        sharedPrefs.edit {
+            putString("hex_command", clean)
+        }
     }
 
     fun setWriteNoResponse(enabled: Boolean) {
         _isWriteNoResponse.value = enabled
-        sharedPrefs.edit().putBoolean("write_no_response", enabled).apply()
+        sharedPrefs.edit {
+            putBoolean("write_no_response", enabled)
+        }
     }
 
     fun setAutoConnectEnabled(enabled: Boolean) {
         _isAutoConnectEnabled.value = enabled
-        sharedPrefs.edit().putBoolean("auto_connect_enabled", enabled).apply()
+        sharedPrefs.edit {
+            putBoolean("auto_connect_enabled", enabled)
+        }
     }
 
     fun startAutoConnectScanIfReady() {
@@ -107,10 +115,10 @@ class NiuViewModel(
     fun connectToDevice(device: ScannedBleDevice) {
         _lastDeviceAddress.value = device.address
         _lastDeviceName.value = device.name
-        sharedPrefs.edit()
-            .putString("last_device_address", device.address)
-            .putString("last_device_name", device.name)
-            .apply()
+        sharedPrefs.edit {
+            putString("last_device_address", device.address)
+            putString("last_device_name", device.name)
+        }
         bleManager.connect(device)
     }
 
@@ -140,21 +148,6 @@ class NiuViewModel(
         }
     }
 
-    fun logEvent(isSuccess: Boolean, message: String) {
-        val currentDevice = connectedDevice.value ?: return
-        viewModelScope.launch {
-            repository.insertLog(
-                OperationLog(
-                    deviceName = currentDevice.name,
-                    macAddress = currentDevice.address,
-                    commandHex = _hexCommand.value,
-                    isSuccess = isSuccess,
-                    statusMessage = message
-                )
-            )
-        }
-    }
-
     fun clearLogHistory() {
         viewModelScope.launch {
             repository.clearLogs()
@@ -168,13 +161,15 @@ class NiuViewModel(
     }
 
     class Factory(
-        private val context: Context,
+        context: Context,
         private val repository: OperationLogRepository
     ) : ViewModelProvider.Factory {
+        private val applicationContext = context.applicationContext
+
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(NiuViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return NiuViewModel(context, repository) as T
+                return NiuViewModel(applicationContext, repository) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
