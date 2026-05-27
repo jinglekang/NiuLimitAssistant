@@ -18,84 +18,53 @@
 
 ## 技术栈
 
-- Kotlin
+- Kotlin (2.2.10)
 - Jetpack Compose
 - Android BLE / GATT
-- Room
-- Gradle Kotlin DSL
+- Room (数据库存储日志)
+- Retrofit / OkHttp (网络请求)
+- Gradle Kotlin DSL / Version Catalog
 
-## 权限说明
+## 快速上手
 
-应用需要蓝牙扫描与连接权限：
+### 1. 环境准备
+- 使用 Android Studio (建议 Jellyfish 或更新版本) 打开项目。
+- 等待 Gradle Sync 完成。
+- 准备一台支持 BLE 的 Android 真机 (Android 6.0+)。
 
-- Android 12 及以上：`BLUETOOTH_SCAN`、`BLUETOOTH_CONNECT`
-- Android 11 及以下：`ACCESS_FINE_LOCATION`、`ACCESS_COARSE_LOCATION`
+### 2. 签名配置
+项目使用自定义签名，请根据需要配置：
 
-项目声明依赖 BLE 硬件：
-
-```xml
-<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
-```
-
-## 本地运行
-
-1. 使用 Android Studio 打开项目根目录。
-2. 等待 Gradle Sync 完成。
-3. 确认根目录存在 `debug.keystore`。
-4. 连接支持 BLE 的 Android 真机。
-5. 运行 `app` 的 debug 构建。
-
-也可以在命令行验证 debug 构建：
-
-```powershell
-.\gradlew.bat assembleDebug
-```
-
-## Debug 签名
-
-debug 构建使用项目内的自定义签名配置：
-
-```kotlin
-debug {
-  signingConfig = signingConfigs.getByName("debugConfig")
-}
-```
-
-对应 keystore 路径为：
-
-```text
-debug.keystore
-```
-
-如果本地没有该文件，可以从仓库中的 `debug.keystore.base64` 恢复：
-
+#### Debug 签名
+Debug 构建需要根目录存在 `debug.keystore`。如果本地缺失，可从 `debug.keystore.base64` 恢复：
 ```powershell
 $base64 = Get-Content -Raw -Path debug.keystore.base64
 [IO.File]::WriteAllBytes((Join-Path (Get-Location) 'debug.keystore'), [Convert]::FromBase64String($base64.Trim()))
 ```
 
-`debug.keystore` 已被 `.gitignore` 忽略，不应提交到仓库。
+#### Release 签名
+默认读取根目录的 `release.jks`。也可通过环境变量配置：
+- `KEYSTORE_PATH`
+- `STORE_PASSWORD`
+- `KEY_PASSWORD`
 
-## Release 签名
+### 3. 编译与运行
+你可以直接通过 Android Studio 的 **Run** 按钮运行，也可以使用命令行：
 
-release 构建默认读取：
+- **Debug 编译**: `.\gradlew.bat assembleDebug`
+- **Release 编译**: `.\gradlew.bat assembleRelease`
+- **安装到设备**: `.\gradlew.bat installDebug`
 
-```text
-my-upload-key.jks
-```
+## 权限说明
 
-也可以通过环境变量指定：
+应用需要蓝牙扫描与连接权限，已在清单文件中声明：
 
-```text
-KEYSTORE_PATH
-STORE_PASSWORD
-KEY_PASSWORD
-```
+- **Android 12+**: `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`
+- **Android 11 及以下**: `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`
+- **硬件要求**: 必须具备蓝牙低功耗硬件支持。
 
-当前如果缺少 release keystore，`build` 任务会在 `packageRelease` 阶段失败；只验证调试包时使用：
-
-```powershell
-.\gradlew.bat assembleDebug
+```xml
+<uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 ```
 
 ## 合规声明
