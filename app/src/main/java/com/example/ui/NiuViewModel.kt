@@ -32,6 +32,18 @@ class NiuViewModel(
         MutableStateFlow(sharedPrefs.getBoolean("write_no_response", true))
     val isWriteNoResponse = _isWriteNoResponse.asStateFlow()
 
+    private val _isAutoConnectEnabled =
+        MutableStateFlow(sharedPrefs.getBoolean("auto_connect_enabled", true))
+    val isAutoConnectEnabled = _isAutoConnectEnabled.asStateFlow()
+
+    private val _lastDeviceAddress =
+        MutableStateFlow(sharedPrefs.getString("last_device_address", "") ?: "")
+    val lastDeviceAddress = _lastDeviceAddress.asStateFlow()
+
+    private val _lastDeviceName =
+        MutableStateFlow(sharedPrefs.getString("last_device_name", "") ?: "")
+    val lastDeviceName = _lastDeviceName.asStateFlow()
+
     val scannedDevices = bleManager.scannedDevices
     val isScanning = bleManager.isScanning
     val connectionState = bleManager.connectionState
@@ -43,6 +55,23 @@ class NiuViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    init {
+        viewModelScope.launch {
+            scannedDevices.collect { devices ->
+                val targetAddress = _lastDeviceAddress.value
+                if (!_isAutoConnectEnabled.value || targetAddress.isBlank()) return@collect
+                if (connectionState.value != com.example.bluetooth.BLEConnectionState.DISCONNECTED) return@collect
+
+                val targetDevice = devices.firstOrNull {
+                    it.address.equals(targetAddress, ignoreCase = true)
+                } ?: return@collect
+
+                bleManager.stopScan()
+                bleManager.connect(targetDevice)
+            }
+        }
+    }
 
     fun setHexCommand(command: String) {
         val clean =
@@ -56,6 +85,17 @@ class NiuViewModel(
         sharedPrefs.edit().putBoolean("write_no_response", enabled).apply()
     }
 
+    fun setAutoConnectEnabled(enabled: Boolean) {
+        _isAutoConnectEnabled.value = enabled
+        sharedPrefs.edit().putBoolean("auto_connect_enabled", enabled).apply()
+    }
+
+    fun startAutoConnectScanIfReady() {
+        if (_isAutoConnectEnabled.value && _lastDeviceAddress.value.isNotBlank()) {
+            bleManager.startScan()
+        }
+    }
+
     fun startScanning() {
         bleManager.startScan()
     }
@@ -65,6 +105,12 @@ class NiuViewModel(
     }
 
     fun connectToDevice(device: ScannedBleDevice) {
+        _lastDeviceAddress.value = device.address
+        _lastDeviceName.value = device.name
+        sharedPrefs.edit()
+            .putString("last_device_address", device.address)
+            .putString("last_device_name", device.name)
+            .apply()
         bleManager.connect(device)
     }
 

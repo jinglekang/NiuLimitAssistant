@@ -1,9 +1,11 @@
 package com.example.ui
 
 import android.os.Build
+import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -62,6 +64,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,6 +103,9 @@ fun MainScreen(viewModel: NiuViewModel) {
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectedDevice by viewModel.connectedDevice.collectAsStateWithLifecycle()
     val writeResult by viewModel.writeResult.collectAsStateWithLifecycle()
+    val isAutoConnectEnabled by viewModel.isAutoConnectEnabled.collectAsStateWithLifecycle()
+    val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsStateWithLifecycle()
+    val lastDeviceName by viewModel.lastDeviceName.collectAsStateWithLifecycle()
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
 
     var onlyShowNiu by remember { mutableStateOf(true) }
@@ -125,6 +131,15 @@ fun MainScreen(viewModel: NiuViewModel) {
             Toast.makeText(context, "蓝牙权限已获取，开始扫描", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(context, "需要蓝牙权限以扫描附近的电动车", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val hasPermissions = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (hasPermissions) {
+            viewModel.startAutoConnectScanIfReady()
         }
     }
 
@@ -199,7 +214,8 @@ fun MainScreen(viewModel: NiuViewModel) {
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Settings,
@@ -645,6 +661,45 @@ fun MainScreen(viewModel: NiuViewModel) {
             }
 
             if (connectionState == BLEConnectionState.DISCONNECTED) {
+                item {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "自动连接上次设备",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (lastDeviceAddress.isBlank()) {
+                                        "手动连接一次后会记住设备"
+                                    } else {
+                                        (lastDeviceName.ifBlank { "已保存设备" }) + " / " + lastDeviceAddress
+                                    },
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
+                            Switch(
+                                checked = isAutoConnectEnabled,
+                                onCheckedChange = { viewModel.setAutoConnectEnabled(it) },
+                                modifier = Modifier.scale(0.85f)
+                            )
+                        }
+                    }
+                }
+
                 item {
                     Card(
                         shape = RoundedCornerShape(16.dp),

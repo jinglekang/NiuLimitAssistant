@@ -8,6 +8,7 @@
 
 - 扫描附近 BLE 设备，并优先展示名称包含 `NIU` / `NIU Link` 的设备
 - 连接真实蓝牙设备并展示连接状态
+- 手动连接后记住上次设备，支持扫描命中后自动连接
 - 校验目标 GATT Service / Characteristic
 - 支持 `WRITE` 和 `WRITE_NO_RESPONSE` 两种写入方式
 - 支持自定义 Hex 指令和预设指令快速填充
