@@ -1,0 +1,6 @@
+{
+  "name": "限速助手",
+  "description": "专为小牛电动车设计的蓝牙限速恢复工具。支持自动扫描 NIU Link 蓝牙设备，快速连接，并一键写入 Hex 限速还原指令，帮助规范电动车合法合规行驶。具备历史还原记录和实时连接状态等功能。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
