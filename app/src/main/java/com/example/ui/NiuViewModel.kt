@@ -26,7 +26,7 @@ class NiuViewModel(
         context.applicationContext.getSharedPreferences("SpeedLimitPrefs", Context.MODE_PRIVATE)
 
     private val _hexCommand = MutableStateFlow(
-        sharedPrefs.getString("hex_command", "5A0C010100000000") ?: "5A0C010100000000"
+        sharedPrefs.getString("hex_command", "") ?: ""
     )
     val hexCommand = _hexCommand.asStateFlow()
 

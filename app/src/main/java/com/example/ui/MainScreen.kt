@@ -434,6 +434,13 @@ fun MainScreen(viewModel: NiuViewModel) {
                             OutlinedTextField(
                                 value = hexCommand,
                                 onValueChange = { viewModel.setHexCommand(it) },
+                                placeholder = {
+                                    Text(
+                                        "请点击下方预设或手动输入代码",
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    )
+                                },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Ascii,
@@ -468,10 +475,9 @@ fun MainScreen(viewModel: NiuViewModel) {
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                val presets = listOf(
-                                    Pair("5A0C010100000000", "指令A (主流)"),
-                                    Pair("A500010000000000", "指令B (老款)"),
-                                    Pair("5A040101", "指令C (国标)")
+                                                               val presets = listOf(
+                                    Pair("6784568726353113346130602277419687263531", "国内还原"),
+                                    Pair("6784855911124499612592282354227987263531", "国外还原")
                                 )
                                 presets.forEach { (code, label) ->
                                     val isSelected = hexCommand.replace(" ", "") == code
