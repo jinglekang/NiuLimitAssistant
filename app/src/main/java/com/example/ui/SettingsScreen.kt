@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -74,6 +75,7 @@ fun SettingsScreen(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         SettingsRow(
+                            icon = Icons.Default.Share,
                             title = "开源地址",
                             value = "jinglekang/NiuLimitAssistant",
                             onClick = { uriHandler.openUri(SOURCE_URL) }
@@ -82,6 +84,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
                         )
                         SettingsRow(
+                            icon = Icons.Default.Info,
                             title = "版本号",
                             value = BuildConfig.VERSION_NAME
                         )
@@ -94,6 +97,7 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     value: String,
     onClick: (() -> Unit)? = null
@@ -107,7 +111,7 @@ private fun SettingsRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Icon(
-            imageVector = Icons.Default.Info,
+            imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary
         )

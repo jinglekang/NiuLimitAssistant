@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -18,7 +19,7 @@ import com.example.R
 fun AppLogo(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(34.dp)
+            .size(38.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color(0xFFA91D18)),
         contentAlignment = Alignment.Center
@@ -26,7 +27,8 @@ fun AppLogo(modifier: Modifier = Modifier) {
         Image(
             painter = painterResource(id = R.drawable.ic_launcher_foreground),
             contentDescription = "小牛限速助手",
-            modifier = Modifier.size(54.dp)
+            // 使用 scale 直接放大内部图标，配合 Box 的 clip 实现“放大镜”效果
+            modifier = Modifier.scale(1.4f)
         )
     }
 }

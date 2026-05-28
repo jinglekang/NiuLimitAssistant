@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -121,6 +122,10 @@ fun ControlScreen(
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
     var selectedCommandTab by remember { mutableIntStateOf(0) }
     var lastWriteOperation by remember { mutableStateOf("自定义") }
+
+    BackHandler {
+        onDisconnectClick()
+    }
 
     LaunchedEffect(connectionState) {
         if (connectionState == BLEConnectionState.CONNECTED) {
