@@ -48,14 +48,7 @@ jobs:
           files: app/build/outputs/apk/release/app-release.apk
           name: NiuLimitAssistant v${{ steps.get_version.outputs.version }}
           tag_name: ${{ github.ref_name }}
-          body: |
-            ## 小牛限速助手 v${{ steps.get_version.outputs.version }}
-            
-            - **多机型适配**：支持 MT Sport / MT City 车辆型号自动识别与特征匹配
-            - **专用指令**：内置关闭/恢复限速、关闭/恢复警告、调整仪表上限等全套合规还原指令
-            - **稳定提升**：优化蓝牙连接握手流程，增加连接超时与错误重试机制
-            - **操作透明**：提供详细的操作日志记录，支持查看历史写入结果
-            - **系统兼容**：适配 Android 12+ 蓝牙权限模型，提升真机兼容性
+          generate_release_notes: true
           draft: false
           prerelease: false
         env:
