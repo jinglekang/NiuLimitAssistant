@@ -1,0 +1,62 @@
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*' # 当推送以 v 开头的标签时触发，如 v1.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > release.jks
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Get Version Name
+        id: get_version
+        run: |
+          VERSION_NAME=$(grep "versionName" app/build.gradle.kts | head -n 1 | awk -F'"' '{print $2}')
+          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          name: NiuLimitAssistant v${{ steps.get_version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## 小牛限速助手 v${{ steps.get_version.outputs.version }}
+            
+            - **多机型适配**：支持 MT Sport / MT City 车辆型号自动识别与特征匹配
+            - **专用指令**：内置关闭/恢复限速、关闭/恢复警告、调整仪表上限等全套合规还原指令
+            - **稳定提升**：优化蓝牙连接握手流程，增加连接超时与错误重试机制
+            - **操作透明**：提供详细的操作日志记录，支持查看历史写入结果
+            - **系统兼容**：适配 Android 12+ 蓝牙权限模型，提升真机兼容性
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
