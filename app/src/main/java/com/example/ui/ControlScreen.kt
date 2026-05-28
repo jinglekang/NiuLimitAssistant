@@ -40,7 +40,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,8 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -116,9 +116,10 @@ fun ControlScreen(
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
     val connectedDevice by viewModel.connectedDevice.collectAsStateWithLifecycle()
     val connectionError by viewModel.connectionError.collectAsStateWithLifecycle()
+    val detectedModel by viewModel.detectedModel.collectAsStateWithLifecycle()
     val writeResult by viewModel.writeResult.collectAsStateWithLifecycle()
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
-    var selectedCommandTab by remember { mutableStateOf(0) }
+    var selectedCommandTab by remember { mutableIntStateOf(0) }
     var lastWriteOperation by remember { mutableStateOf("自定义") }
 
     LaunchedEffect(connectionState) {
@@ -216,6 +217,24 @@ fun ControlScreen(
                                         fontSize = 15.sp
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
+                                    detectedModel?.let { modelName ->
+                                        Row(
+                                            modifier = Modifier
+                                                .background(
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                    RoundedCornerShape(4.dp)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                modelName,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
                                     if (connectionState == BLEConnectionState.READY) {
                                         Row(
                                             modifier = Modifier
@@ -436,8 +455,8 @@ fun ControlScreen(
                                                     )
                                                 },
                                                 enabled = !isWriting &&
-                                                    !item.disabled &&
-                                                    item.command.isNotBlank(),
+                                                        !item.disabled &&
+                                                        item.command.isNotBlank(),
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .height(42.dp),
@@ -789,12 +808,16 @@ fun ControlScreen(
                                                 text = log.deviceName,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.72f
+                                                )
                                             )
                                             Text(
                                                 text = log.macAddress,
                                                 fontSize = 10.sp,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f)
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.46f
+                                                )
                                             )
                                         }
 

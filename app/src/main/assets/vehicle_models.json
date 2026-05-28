@@ -1,0 +1,12 @@
+[
+  {
+    "modelName": "MT Sport",
+    "serviceUuid": "8ec94e30-f315-4f60-9fb8-838830daea51",
+    "characteristicUuid": "8ec94e32-f315-4f60-9fb8-838830daea51"
+  },
+  {
+    "modelName": "MT City",
+    "serviceUuid": "8ec94e30-f315-4f60-9fb8-838830daea52",
+    "characteristicUuid": "8ec94e32-f315-4f60-9fb8-838830daea52"
+  }
+]

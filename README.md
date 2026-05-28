@@ -61,8 +61,9 @@ $env:KEY_ALIAS="RELEASE"
 ```
 
 ### 3. 编译与运行
-你可以直接通过 Android Studio 的 **Run** 按钮运行，也可以使用命令行：
+你可以直接通过 Android Studio 的 **Run** 按钮运行，也可以使用自动化脚本或命令行：
 
+- **自动化一键构建 (推荐)**: 运行 `.\package.ps1`，成功后 APK 会存放在 `build/release/` 目录下。
 - **Debug 编译**: `.\gradlew.bat assembleDebug`
 - **Release 编译**: `.\gradlew.bat assembleRelease`
 - **安装到设备**: `.\gradlew.bat installDebug`

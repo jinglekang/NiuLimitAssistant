@@ -62,6 +62,7 @@ class NiuViewModel(
     val connectedDevice = bleManager.connectedDevice
     val connectionError = bleManager.connectionError
     val writeResult = bleManager.writeResult
+    val detectedModel = bleManager.detectedModel
 
     val operationLogs = repository.allLogs.stateIn(
         scope = viewModelScope,

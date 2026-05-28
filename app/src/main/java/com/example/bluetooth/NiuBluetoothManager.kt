@@ -18,6 +18,7 @@ import android.os.Looper
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
 import java.util.UUID
 
 enum class BLEConnectionState {
@@ -42,6 +43,12 @@ data class ScannedBleDevice(
     val rssi: Int,
     val device: BluetoothDevice?,
     val isNiuLink: Boolean = false
+)
+
+data class VehicleModel(
+    val name: String,
+    val serviceUuid: UUID,
+    val characteristicUuid: UUID
 )
 
 class NiuBluetoothManager(private val context: Context) {
@@ -69,6 +76,9 @@ class NiuBluetoothManager(private val context: Context) {
     private val _writeResult = MutableStateFlow<WriteResult>(WriteResult.Idle)
     val writeResult = _writeResult.asStateFlow()
 
+    private val _detectedModel = MutableStateFlow<String?>(null)
+    val detectedModel = _detectedModel.asStateFlow()
+
     private var activeGatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
 
@@ -84,8 +94,33 @@ class NiuBluetoothManager(private val context: Context) {
         }
     }
 
-    val SERVICE_UUID: UUID = UUID.fromString("8ec94e30-f315-4f60-9fb8-838830daea51")
-    val CHARACTERISTIC_UUID: UUID = UUID.fromString("8ec94e32-f315-4f60-9fb8-838830daea51")
+    private val vehicleModels: List<VehicleModel> = loadVehicleModels()
+    private var currentModel: VehicleModel? = null
+
+    private fun loadVehicleModels(): List<VehicleModel> {
+        return try {
+            val json = context.assets.open("vehicle_models.json").bufferedReader().use { it.readText() }
+            val array = JSONArray(json)
+            List(array.length()) { i ->
+                val obj = array.getJSONObject(i)
+                VehicleModel(
+                    name = obj.getString("modelName"),
+                    serviceUuid = UUID.fromString(obj.getString("serviceUuid")),
+                    characteristicUuid = UUID.fromString(obj.getString("characteristicUuid"))
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load vehicle models from assets", e)
+            // Fallback
+            listOf(
+                VehicleModel(
+                    "MT Sport",
+                    UUID.fromString("8ec94e30-f315-4f60-9fb8-838830daea51"),
+                    UUID.fromString("8ec94e32-f315-4f60-9fb8-838830daea51")
+                )
+            )
+        }
+    }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -316,6 +351,8 @@ class NiuBluetoothManager(private val context: Context) {
         _connectedDevice.value = null
         _connectionError.value = null
         _writeResult.value = WriteResult.Idle
+        _detectedModel.value = null
+        currentModel = null
         closeGattQuietly()
     }
 
@@ -386,17 +423,25 @@ class NiuBluetoothManager(private val context: Context) {
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                val service = gatt.getService(SERVICE_UUID)
-                val characteristic = service?.getCharacteristic(CHARACTERISTIC_UUID)
+                var found = false
+                for (model in vehicleModels) {
+                    val service = gatt.getService(model.serviceUuid)
+                    val characteristic = service?.getCharacteristic(model.characteristicUuid)
+                    if (characteristic != null) {
+                        writeCharacteristic = characteristic
+                        currentModel = model
+                        _detectedModel.value = model.name
+                        _connectionError.value = null
+                        _connectionState.value = BLEConnectionState.READY
+                        Log.d(TAG, "Target Service and Characteristic found for model: ${model.name}")
+                        found = true
+                        break
+                    }
+                }
 
-                if (characteristic != null) {
-                    writeCharacteristic = characteristic
-                    _connectionError.value = null
-                    _connectionState.value = BLEConnectionState.READY
-                    Log.d(TAG, "Target Service and Characteristic found!")
-                } else {
-                    Log.e(TAG, "Target characteristic or service not found!")
-                    _connectionError.value = "当前车辆不支持此功能"
+                if (!found) {
+                    Log.e(TAG, "No matching vehicle model found in discovered services")
+                    _connectionError.value = "当前车辆型号不支持"
                     _connectionState.value = BLEConnectionState.FAILED
                 }
             } else {
@@ -411,7 +456,8 @@ class NiuBluetoothManager(private val context: Context) {
             characteristic: BluetoothGattCharacteristic,
             status: Int
         ) {
-            if (characteristic.uuid == CHARACTERISTIC_UUID) {
+            val isCurrentChar = currentModel?.let { characteristic.uuid == it.characteristicUuid } ?: false
+            if (isCurrentChar) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     _writeResult.value = WriteResult.Success
                     pendingLogCallback?.invoke(true, "写入成功")
