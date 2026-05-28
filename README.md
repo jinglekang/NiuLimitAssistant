@@ -2,7 +2,13 @@
 
 小牛限速助手是一款面向小牛电动车的 Android 蓝牙工具，用于扫描附近的 `NIU Link` BLE 设备、建立 GATT 连接，并向指定服务特征写入合规限速恢复指令。
 
-本项目当前仅保留真机蓝牙流程，不包含模拟设备或模拟写入模式。
+## 支持型号
+
+目前本工具已完成以下型号的蓝牙特征匹配与自动化识别：
+- **MT Sport**
+- **MT City**
+
+> 注：其他型号由于蓝牙 Service/Characteristic UUID 可能不同，目前暂不支持。
 
 ## 主要功能
 
@@ -13,7 +19,6 @@
 - 支持 `WRITE` 和 `WRITE_NO_RESPONSE` 两种写入方式
 - 支持自定义 Hex 指令和预设指令快速填充
 - 记录车辆名称、MAC 地址、写入指令、结果和时间
-- 本地保存操作日志，支持清空历史记录
 - 内置合规声明，限定用于合法合规限速还原场景
 
 ## 技术栈
@@ -66,7 +71,6 @@ $env:KEY_ALIAS="RELEASE"
 - **自动化一键构建 (推荐)**: 运行 `.\package.ps1`，成功后 APK 会存放在 `build/release/` 目录下。
 - **Debug 编译**: `.\gradlew.bat assembleDebug`
 - **Release 编译**: `.\gradlew.bat assembleRelease`
-- **安装到设备**: `.\gradlew.bat installDebug`
 
 ## 权限说明
 
