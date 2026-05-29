@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -8,9 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,9 +67,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -101,7 +106,7 @@ private fun loadCommandButtons(context: Context): List<CommandButton> {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ControlScreen(
     viewModel: NiuViewModel,
@@ -109,6 +114,7 @@ fun ControlScreen(
     onSettingsClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val focusManager = LocalFocusManager.current
     val mainCommandButtons = remember { loadCommandButtons(context) }
 
@@ -709,40 +715,33 @@ fun ControlScreen(
                                                 MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                                                 RoundedCornerShape(10.dp)
                                             )
-                                            .padding(10.dp)
+                                            .padding(horizontal = 10.dp, vertical = 8.dp)
                                     ) {
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.Top
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                                                 modifier = Modifier.weight(1f)
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(8.dp)
+                                                        .size(7.dp)
                                                         .background(
                                                             if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
                                                             CircleShape
                                                         )
                                                 )
-                                                Column {
-                                                    Text(
-                                                        text = log.operationType,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 13.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = log.statusMessage,
-                                                        fontSize = 10.sp,
-                                                        color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                }
+                                                Text(
+                                                    text = log.operationType,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1
+                                                )
                                             }
                                             Text(
                                                 text = log.formattedTime,
@@ -753,19 +752,32 @@ fun ControlScreen(
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(2.dp))
+
+                                        Text(
+                                            text = log.statusMessage,
+                                            fontSize = 10.sp,
+                                            color = if (log.isSuccess) SafeGreen else MaterialTheme.colorScheme.error,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
+
+                                        Spacer(modifier = Modifier.height(5.dp))
 
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
                                                 text = log.deviceName,
+                                                modifier = Modifier.weight(1f),
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurface.copy(
                                                     alpha = 0.72f
-                                                )
+                                                ),
+                                                maxLines = 1
                                             )
                                             Text(
                                                 text = log.macAddress,
@@ -776,7 +788,7 @@ fun ControlScreen(
                                             )
                                         }
 
-                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Spacer(modifier = Modifier.height(5.dp))
 
                                         Text(
                                             text = log.commandHex,
@@ -786,7 +798,20 @@ fun ControlScreen(
                                                     MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
                                                     RoundedCornerShape(6.dp)
                                                 )
-                                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                .combinedClickable(
+                                                    onClick = {},
+                                                    onLongClick = {
+                                                        clipboardManager.setText(
+                                                            AnnotatedString(log.commandHex)
+                                                        )
+                                                        Toast.makeText(
+                                                            context,
+                                                            "指令已复制",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 4.dp),
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurface.copy(
                                                 alpha = 0.52f
@@ -811,20 +836,29 @@ fun ControlScreen(
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(
+                        0.75.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = NiuRed,
+                            strokeWidth = 2.dp
+                        )
                         Text(
                             "指令发射中，请靠近车辆...",
                             style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -842,7 +876,17 @@ fun ControlScreen(
                 Icon(
                     imageVector = if (res is WriteResult.Success) Icons.Default.CheckCircle else Icons.Default.Warning,
                     contentDescription = null,
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier
+                        .background(
+                            if (res is WriteResult.Success) {
+                                SafeGreen.copy(alpha = 0.14f)
+                            } else {
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+                            },
+                            CircleShape
+                        )
+                        .padding(8.dp)
+                        .size(28.dp),
                     tint = if (res is WriteResult.Success) SafeGreen else MaterialTheme.colorScheme.error
                 )
             },
@@ -874,11 +918,20 @@ fun ControlScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { dismissWriteResultDialog() }) {
+                Button(
+                    onClick = { dismissWriteResultDialog() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (res is WriteResult.Success) NiuRed else MaterialTheme.colorScheme.error,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                     Text("知道了", fontWeight = FontWeight.Bold)
                 }
             },
-            shape = RoundedCornerShape(20.dp)
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 }
