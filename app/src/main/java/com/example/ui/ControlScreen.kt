@@ -128,6 +128,7 @@ fun ControlScreen(
     val operationLogs by viewModel.operationLogs.collectAsStateWithLifecycle()
     var selectedCommandTab by remember { mutableIntStateOf(0) }
     var lastWriteOperation by remember { mutableStateOf("自定义") }
+    var visibleLogCount by remember { mutableIntStateOf(10) }
 
     // 结果弹窗状态
     var showResultDialog by remember { mutableStateOf(value = false) }
@@ -252,7 +253,7 @@ fun ControlScreen(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     val statusBadgeText = when {
                                         detectedModel?.startsWith("模拟", ignoreCase = true) == true -> detectedModel
-                                        connectionState == BLEConnectionState.READY -> "NIU Link 认证"
+                                        connectionState == BLEConnectionState.READY -> "认证 NIU Link"
                                         else -> detectedModel
                                     }
                                     statusBadgeText?.let { badgeText ->
@@ -582,7 +583,7 @@ fun ControlScreen(
                                     enabled = !isWriting && canWrite,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(48.dp)
+                                        .height(42.dp)
                                         .testTag("restore_speed_button"),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = NiuRed,
@@ -698,7 +699,7 @@ fun ControlScreen(
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                operationLogs.take(15).forEachIndexed { index, log ->
+                                operationLogs.take(visibleLogCount).forEachIndexed { index, log ->
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -822,6 +823,18 @@ fun ControlScreen(
                 }
             }
         }
+                                if (operationLogs.size > visibleLogCount) {
+                                    TextButton(
+                                        onClick = { visibleLogCount += 10 },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            "加载更多",
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
             }
                 }
             }
@@ -918,15 +931,23 @@ fun ControlScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = { dismissWriteResultDialog() },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (res is WriteResult.Success) NiuRed else MaterialTheme.colorScheme.error,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(8.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text("知道了", fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = { dismissWriteResultDialog() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (res is WriteResult.Success) NiuRed else MaterialTheme.colorScheme.error,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth(0.72f)
+                            .height(42.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("知道了", fontWeight = FontWeight.Bold)
+                    }
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface,
