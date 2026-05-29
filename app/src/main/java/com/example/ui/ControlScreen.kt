@@ -9,6 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,8 +50,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -166,14 +166,19 @@ fun ControlScreen(
             item {
                 val cardBrush = Brush.linearGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.surfaceVariant,
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
                         MaterialTheme.colorScheme.surface
                     )
                 )
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                    border = BorderStroke(
+                        0.75.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.26f)
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -206,8 +211,9 @@ fun ControlScreen(
                                 onClick = onDisconnectClick,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.error.copy(
-                                        alpha = 0.15f
-                                    ), contentColor = MaterialTheme.colorScheme.error
+                                        alpha = 0.92f
+                                    ),
+                                    contentColor = MaterialTheme.colorScheme.onError
                                 ),
                                 contentPadding = PaddingValues(
                                     horizontal = 12.dp,
@@ -367,7 +373,11 @@ fun ControlScreen(
                     Card(
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                        border = BorderStroke(
+                            0.75.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -382,7 +392,7 @@ fun ControlScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = "恢复官方限速写入终端",
+                                    text = "指令写入控制台",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
@@ -394,7 +404,7 @@ fun ControlScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(
-                                        MaterialTheme.colorScheme.background,
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                                         RoundedCornerShape(10.dp)
                                     )
                                     .padding(8.dp),
@@ -423,33 +433,57 @@ fun ControlScreen(
                             val isWriting = writeResult == WriteResult.Writing
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            TabRow(
-                                selectedTabIndex = selectedCommandTab,
-                                containerColor = MaterialTheme.colorScheme.background,
-                                contentColor = MaterialTheme.colorScheme.primary
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        0.5.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.16f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Tab(
-                                    selected = selectedCommandTab == 0,
-                                    onClick = { selectedCommandTab = 0 },
-                                    text = {
+                                listOf("预设", "自定义").forEachIndexed { index, label ->
+                                    val selected = selectedCommandTab == index
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(36.dp)
+                                            .clickable { selectedCommandTab = index },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
                                         Text(
-                                            "预设",
+                                            label,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                            fontSize = 13.sp,
+                                            color = if (selected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.58f)
+                                            }
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(0.62f)
+                                                .height(3.dp)
+                                                .background(
+                                                    if (selected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        Color.Transparent
+                                                    },
+                                                    RoundedCornerShape(3.dp)
+                                                )
                                         )
                                     }
-                                )
-                                Tab(
-                                    selected = selectedCommandTab == 1,
-                                    onClick = { selectedCommandTab = 1 },
-                                    text = {
-                                        Text(
-                                            "自定义",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(12.dp))
@@ -478,7 +512,9 @@ fun ControlScreen(
                                                     .height(42.dp),
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = MaterialTheme.colorScheme.primary,
-                                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+                                                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                                 ),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
@@ -513,7 +549,11 @@ fun ControlScreen(
                                         .fillMaxWidth()
                                         .testTag("hex_command_input"),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f),
+                                        cursorColor = MaterialTheme.colorScheme.primary
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     textStyle = LocalTextStyle.current.copy(
@@ -540,7 +580,9 @@ fun ControlScreen(
                                         .testTag("restore_speed_button"),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = NiuRed,
-                                        contentColor = Color.White
+                                        contentColor = Color.White,
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.64f),
+                                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
@@ -577,10 +619,10 @@ fun ControlScreen(
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     border = BorderStroke(
-                        0.5.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                        0.75.dp,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -600,7 +642,7 @@ fun ControlScreen(
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = "限速合规恢复操作日志",
+                                    text = "操作日志",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
@@ -650,12 +692,21 @@ fun ControlScreen(
                             Column(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                operationLogs.take(15).forEach { log ->
+                                operationLogs.take(15).forEachIndexed { index, log ->
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .background(
-                                                MaterialTheme.colorScheme.background,
+                                                if (index % 2 == 0) {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                                                } else {
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
+                                                },
+                                                RoundedCornerShape(10.dp)
+                                            )
+                                            .border(
+                                                0.75.dp,
+                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                                                 RoundedCornerShape(10.dp)
                                             )
                                             .padding(10.dp)

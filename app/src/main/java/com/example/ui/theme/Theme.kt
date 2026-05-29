@@ -18,6 +18,9 @@ private val DarkColorScheme =
         tertiary = AccentTeal,
         background = DeepDarkBlue,
         surface = CardBackgroundDark,
+        surfaceVariant = Color(0xFF222B3F),
+        secondaryContainer = Color(0xFF123329),
+        outline = Color(0xFF3A465F),
         onPrimary = Color.White,
         onSecondary = Color.Black,
         onBackground = TextLightGray,
@@ -29,8 +32,11 @@ private val LightColorScheme =
         primary = NiuRed,
         secondary = SafeGreen,
         tertiary = AccentTeal,
-        background = Color(0xFFF8FAFC),
+        background = Color(0xFFF1F5F9),
         surface = Color.White,
+        surfaceVariant = Color(0xFFE2E8F0),
+        secondaryContainer = Color(0xFFD9FBE8),
+        outline = Color(0xFFCBD5E1),
         onPrimary = Color.White,
         onSecondary = Color.Black,
         onBackground = Color(0xFF0F172A),
@@ -40,7 +46,7 @@ private val LightColorScheme =
 @Composable
 fun NiuLimitAssistantTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme =

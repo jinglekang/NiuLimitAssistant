@@ -23,11 +23,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,7 +40,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -108,7 +107,8 @@ fun ConnectScreen(
     ) { results ->
         val allGranted = requiredPermissions.all { results[it] == true }
         if (allGranted) {
-            val reconnectStarted = viewModel.tryReconnectLastDeviceOnce(hasRequiredPermissions = true)
+            val reconnectStarted =
+                viewModel.tryReconnectLastDeviceOnce(hasRequiredPermissions = true)
             if (!reconnectStarted) {
                 viewModel.startScanning()
             }
@@ -389,116 +389,112 @@ fun ConnectScreen(
                                         ),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                                     ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            modifier = Modifier.weight(1f)
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
                                         ) {
-                                             Column(modifier = Modifier.weight(1f)) {
-                                                 Text(
-                                                     text = dev.name,
-                                                     fontWeight = FontWeight.Bold,
-                                                     fontSize = 14.sp,
-                                                     color = MaterialTheme.colorScheme.onSurface,
-                                                     maxLines = 1,
-                                                     overflow = TextOverflow.Ellipsis
-                                                 )
-                                                 Spacer(modifier = Modifier.height(2.dp))
-                                                 val deviceTags = listOfNotNull(
-                                                    if (dev.isNiuLink) "NIU车辆" else null,
-                                                    if (isLastDevice) "上次连接" else null
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = dev.name,
+                                                    modifier = Modifier.weight(1f),
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "MAC: " + dev.address,
-                                                        modifier = Modifier.weight(1f),
-                                                        fontSize = 11.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(
-                                                            alpha = 0.5f
-                                                        ),
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                     )
-                                                    deviceTags.forEach { tag ->
+
+                                                if (isConnectingThisDevice) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                    ) {
+                                                        CircularProgressIndicator(
+                                                            modifier = Modifier.size(16.dp),
+                                                            strokeWidth = 2.dp
+                                                        )
                                                         Text(
-                                                            text = tag,
-                                                            modifier = Modifier
-                                                                .background(
-                                                                    if (tag == "上次连接") {
-                                                                        SafeGreen.copy(alpha = 0.12f)
-                                                                    } else {
-                                                                        NiuRed.copy(alpha = 0.1f)
-                                                                    },
-                                                                    RoundedCornerShape(999.dp)
-                                                                )
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                                                            fontSize = 9.sp,
+                                                            text = "连接中",
+                                                            fontSize = 11.sp,
                                                             fontWeight = FontWeight.Bold,
-                                                            color = if (tag == "上次连接") SafeGreen else NiuRed,
-                                                            maxLines = 1
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                } else {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "${dev.rssi} dBm",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (dev.rssi > -65) SafeGreen else MaterialTheme.colorScheme.onSurface.copy(
+                                                                alpha = 0.4f
+                                                            )
+                                                        )
+                                                        Icon(
+                                                            imageVector = Icons.Default.PlayArrow,
+                                                            contentDescription = "连接",
+                                                            tint = MaterialTheme.colorScheme.primary.copy(
+                                                                alpha = 0.6f
+                                                            ),
+                                                            modifier = Modifier.size(16.dp)
                                                         )
                                                     }
                                                 }
-                                             }
-                                         }
-
-                                         if (isConnectingThisDevice) {
-                                             Row(
-                                                modifier = Modifier.padding(start = 8.dp),
-                                                 verticalAlignment = Alignment.CenterVertically,
-                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                             ) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(16.dp),
-                                                    strokeWidth = 2.dp
-                                                )
-                                                Text(
-                                                    text = "连接中",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
                                             }
-                                         } else {
-                                             Row(
-                                                modifier = Modifier.padding(start = 8.dp),
-                                                 verticalAlignment = Alignment.CenterVertically,
-                                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                             ) {
+
+                                            val deviceTags = listOfNotNull(
+                                                if (dev.isNiuLink) "NIU车辆" else null,
+                                                if (isLastDevice) "上次连接" else null
+                                            )
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
                                                 Text(
-                                                    text = "${dev.rssi} dBm",
+                                                    text = "MAC: " + dev.address,
+                                                    modifier = Modifier.weight(1f),
                                                     fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = if (dev.rssi > -65) SafeGreen else MaterialTheme.colorScheme.onSurface.copy(
-                                                        alpha = 0.4f
-                                                    )
-                                                )
-                                                Icon(
-                                                    imageVector = Icons.Default.PlayArrow,
-                                                    contentDescription = "连接",
-                                                    tint = MaterialTheme.colorScheme.primary.copy(
-                                                        alpha = 0.6f
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(
+                                                        alpha = 0.5f
                                                     ),
-                                                    modifier = Modifier.size(16.dp)
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
-                                             }
-                                         }
-                                     }
+                                                deviceTags.forEach { tag ->
+                                                    Text(
+                                                        text = tag,
+                                                        modifier = Modifier
+                                                            .background(
+                                                                if (tag == "上次连接") {
+                                                                    SafeGreen.copy(alpha = 0.12f)
+                                                                } else {
+                                                                    NiuRed.copy(alpha = 0.1f)
+                                                                },
+                                                                RoundedCornerShape(4.dp)
+                                                            )
+                                                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = if (tag == "上次连接") SafeGreen else NiuRed,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
-                                 }
-                             }
-                         }
+                                }
+                            }
+                        }
                     }
                 }
             }

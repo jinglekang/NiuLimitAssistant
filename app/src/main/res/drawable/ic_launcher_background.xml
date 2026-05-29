@@ -5,14 +5,14 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#A91D18"
+        android:fillColor="#DA0024"
         android:pathData="M0,0h108v108h-108z" />
     <path
-        android:fillColor="#D83A32"
+        android:fillColor="#FF4D64"
         android:fillAlpha="0.36"
         android:pathData="M-8,80C9,67 25,63 42,69C63,77 78,70 116,39V116H-8z" />
     <path
-        android:fillColor="#68100D"
+        android:fillColor="#7A0014"
         android:fillAlpha="0.22"
         android:pathData="M61,-12C82,-2 100,16 113,41C92,33 75,30 58,33C39,36 23,47 4,65C9,26 30,2 61,-12z" />
     <path

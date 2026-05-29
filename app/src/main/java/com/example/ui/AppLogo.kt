@@ -10,10 +10,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.ui.theme.NiuRed
 
 @Composable
 fun AppLogo(modifier: Modifier = Modifier) {
@@ -21,7 +21,7 @@ fun AppLogo(modifier: Modifier = Modifier) {
         modifier = modifier
             .size(38.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFA91D18)),
+            .background(NiuRed),
         contentAlignment = Alignment.Center
     ) {
         Image(
