@@ -9,22 +9,22 @@
   },
   {
     "label": "关闭仪表上限",
-    "disabled": true,
+    "disabled": false,
     "command": "6784855911124499612592282354227984263531"
   },
   {
     "label": "恢复仪表上限",
-    "disabled": true,
+    "disabled": false,
     "command": "6784855911124499612592282354227984253531"
   },
   {
     "label": "关闭限速",
-    "disabled": true,
+    "disabled": false,
     "command": "6784855911124499612592282354227986283531"
   },
   {
     "label": "关闭警告",
-    "disabled": true,
+    "disabled": false,
     "command": "6784855911124499612592282354227986293531"
   }
 ]
