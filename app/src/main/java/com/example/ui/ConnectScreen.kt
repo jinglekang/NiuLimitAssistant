@@ -21,21 +21,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +53,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -75,6 +75,7 @@ fun ConnectScreen(
     val scannedDevices by viewModel.scannedDevices.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val isAutoConnectEnabled by viewModel.isAutoConnectEnabled.collectAsStateWithLifecycle()
+    val isSimulationEnabled by viewModel.isSimulationEnabled.collectAsStateWithLifecycle()
     val lastDeviceAddress by viewModel.lastDeviceAddress.collectAsStateWithLifecycle()
     val lastDeviceName by viewModel.lastDeviceName.collectAsStateWithLifecycle()
     val connectionState by viewModel.connectionState.collectAsStateWithLifecycle()
@@ -107,7 +108,7 @@ fun ConnectScreen(
     ) { results ->
         val allGranted = requiredPermissions.all { results[it] == true }
         if (allGranted) {
-            val reconnectStarted = viewModel.tryReconnectLastDeviceOnce(true)
+            val reconnectStarted = viewModel.tryReconnectLastDeviceOnce(hasRequiredPermissions = true)
             if (!reconnectStarted) {
                 viewModel.startScanning()
             }
@@ -121,8 +122,8 @@ fun ConnectScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        val hasPermissions = requiredPermissions.all {
+    LaunchedEffect(isSimulationEnabled) {
+        val hasPermissions = isSimulationEnabled || requiredPermissions.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         viewModel.tryReconnectLastDeviceOnce(hasPermissions)
@@ -223,6 +224,8 @@ fun ConnectScreen(
                                 onClick = {
                                     if (isScanning) {
                                         viewModel.stopScanning()
+                                    } else if (isSimulationEnabled) {
+                                        viewModel.startScanning()
                                     } else {
                                         permissionLauncher.launch(requiredPermissions)
                                     }
@@ -274,27 +277,30 @@ fun ConnectScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "过滤条件: " + if (onlyShowNiu) "仅显示NIU小牛车辆" else "显示全部蓝牙设备",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                text = "发现列表",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
-                            TextButton(
+                            FilterChip(
+                                selected = onlyShowNiu,
                                 onClick = { viewModel.setOnlyShowNiu(!onlyShowNiu) },
-                                contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier.height(24.dp)
-                            ) {
-                                Text(
-                                    text = if (onlyShowNiu) "显示全部" else "仅设NIU",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                                label = { Text("仅显示 NIU", fontSize = 11.sp) },
+                                leadingIcon = if (onlyShowNiu) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else null
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        if (connectionState == BLEConnectionState.FAILED && !connectionError.isNullOrBlank()) {
+                        if ((connectionState == BLEConnectionState.FAILED) && !connectionError.isNullOrBlank()) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -354,26 +360,39 @@ fun ConnectScreen(
                             }
                         } else {
                             Column(
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                filteredList.take(6).forEach { dev ->
+                                filteredList.take(6).forEachIndexed { index, dev ->
                                     val isLastDevice =
                                         dev.address.equals(lastDeviceAddress, ignoreCase = true)
                                     val isConnectingThisDevice =
                                         isConnecting && dev.address == connectingDeviceAddress
-                                    Row(
+                                    Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(
-                                                MaterialTheme.colorScheme.background,
-                                                RoundedCornerShape(12.dp)
-                                            )
                                             .clickable(enabled = !isConnecting) {
                                                 connectingDeviceAddress = dev.address
                                                 onDeviceClick(dev)
                                             }
-                                            .padding(12.dp)
                                             .testTag("device_item_${dev.address}"),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (index % 2 == 0) {
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
+                                            }
+                                        ),
+                                        border = BorderStroke(
+                                            0.75.dp,
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
+                                        ),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                                    ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
@@ -382,60 +401,64 @@ fun ConnectScreen(
                                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                                             modifier = Modifier.weight(1f)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .background(
-                                                        if (dev.isNiuLink) NiuRed.copy(alpha = 0.1f) else MaterialTheme.colorScheme.primary.copy(
-                                                            alpha = 0.1f
-                                                        ),
-                                                        CircleShape
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (dev.isNiuLink) Icons.Default.Lock else Icons.Default.Settings,
-                                                    contentDescription = null,
-                                                    tint = if (dev.isNiuLink) NiuRed else MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = dev.name,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                val deviceTags = listOfNotNull(
+                                             Column(modifier = Modifier.weight(1f)) {
+                                                 Text(
+                                                     text = dev.name,
+                                                     fontWeight = FontWeight.Bold,
+                                                     fontSize = 14.sp,
+                                                     color = MaterialTheme.colorScheme.onSurface,
+                                                     maxLines = 1,
+                                                     overflow = TextOverflow.Ellipsis
+                                                 )
+                                                 Spacer(modifier = Modifier.height(2.dp))
+                                                 val deviceTags = listOfNotNull(
                                                     if (dev.isNiuLink) "NIU车辆" else null,
                                                     if (isLastDevice) "上次连接" else null
                                                 )
-                                                if (deviceTags.isNotEmpty()) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
                                                     Text(
-                                                        text = deviceTags.joinToString(" · "),
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = if (dev.isNiuLink) NiuRed else SafeGreen
-                                                    )
-                                                    Spacer(modifier = Modifier.height(1.dp))
+                                                        text = "MAC: " + dev.address,
+                                                        modifier = Modifier.weight(1f),
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(
+                                                            alpha = 0.5f
+                                                        ),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                     )
+                                                    deviceTags.forEach { tag ->
+                                                        Text(
+                                                            text = tag,
+                                                            modifier = Modifier
+                                                                .background(
+                                                                    if (tag == "上次连接") {
+                                                                        SafeGreen.copy(alpha = 0.12f)
+                                                                    } else {
+                                                                        NiuRed.copy(alpha = 0.1f)
+                                                                    },
+                                                                    RoundedCornerShape(999.dp)
+                                                                )
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (tag == "上次连接") SafeGreen else NiuRed,
+                                                            maxLines = 1
+                                                        )
+                                                    }
                                                 }
-                                                Text(
-                                                    text = "MAC: " + dev.address,
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(
-                                                        alpha = 0.5f
-                                                    )
-                                                )
-                                            }
-                                        }
+                                             }
+                                         }
 
-                                        if (isConnectingThisDevice) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
+                                         if (isConnectingThisDevice) {
+                                             Row(
+                                                modifier = Modifier.padding(start = 8.dp),
+                                                 verticalAlignment = Alignment.CenterVertically,
+                                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                             ) {
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(16.dp),
                                                     strokeWidth = 2.dp
@@ -447,11 +470,12 @@ fun ConnectScreen(
                                                     color = MaterialTheme.colorScheme.primary
                                                 )
                                             }
-                                        } else {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
+                                         } else {
+                                             Row(
+                                                modifier = Modifier.padding(start = 8.dp),
+                                                 verticalAlignment = Alignment.CenterVertically,
+                                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                             ) {
                                                 Text(
                                                     text = "${dev.rssi} dBm",
                                                     fontSize = 11.sp,
@@ -468,12 +492,13 @@ fun ConnectScreen(
                                                     ),
                                                     modifier = Modifier.size(16.dp)
                                                 )
-                                            }
-                                        }
+                                             }
+                                         }
+                                     }
                                     }
-                                }
-                            }
-                        }
+                                 }
+                             }
+                         }
                     }
                 }
             }

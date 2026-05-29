@@ -69,6 +69,7 @@ fun MainScreen(viewModel: NiuViewModel) {
 
         composable(MainRoute.SETTINGS) {
             SettingsScreen(
+                viewModel = viewModel,
                 onBackClick = { navController.popBackStack() }
             )
         }

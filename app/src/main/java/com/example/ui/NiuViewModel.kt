@@ -39,6 +39,10 @@ class NiuViewModel(
         MutableStateFlow(sharedPrefs.getBoolean("auto_connect_enabled", true))
     val isAutoConnectEnabled = _isAutoConnectEnabled.asStateFlow()
 
+    private val _isSimulationEnabled =
+        MutableStateFlow(sharedPrefs.getBoolean("simulation_enabled", false))
+    val isSimulationEnabled = _isSimulationEnabled.asStateFlow()
+
     private val _lastDeviceAddress =
         MutableStateFlow(sharedPrefs.getString("last_device_address", "") ?: "")
     val lastDeviceAddress = _lastDeviceAddress.asStateFlow()
@@ -51,6 +55,10 @@ class NiuViewModel(
     val onlyShowNiu = _onlyShowNiu.asStateFlow()
 
     private var autoReconnectAttempted = false
+
+    init {
+        bleManager.setSimulationEnabled(_isSimulationEnabled.value)
+    }
 
     fun setOnlyShowNiu(value: Boolean) {
         _onlyShowNiu.value = value
@@ -94,10 +102,18 @@ class NiuViewModel(
         }
     }
 
+    fun setSimulationEnabled(enabled: Boolean) {
+        _isSimulationEnabled.value = enabled
+        sharedPrefs.edit {
+            putBoolean("simulation_enabled", enabled)
+        }
+        bleManager.setSimulationEnabled(enabled)
+    }
+
     fun tryReconnectLastDeviceOnce(hasRequiredPermissions: Boolean): Boolean {
-        if (!hasRequiredPermissions) return false
         if (autoReconnectAttempted) return false
         autoReconnectAttempted = true
+        if (!hasRequiredPermissions) return false
         if (!_isAutoConnectEnabled.value || _lastDeviceAddress.value.isBlank()) return false
         if (connectionState.value != BLEConnectionState.DISCONNECTED) return false
 
@@ -128,6 +144,10 @@ class NiuViewModel(
 
     fun discoverConnectedDeviceServices() {
         bleManager.discoverServices()
+    }
+
+    fun clearWriteResult() {
+        bleManager.clearWriteResult()
     }
 
     fun disconnectDevice() {

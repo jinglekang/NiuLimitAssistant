@@ -32,9 +32,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -123,6 +123,9 @@ fun ControlScreen(
     var selectedCommandTab by remember { mutableIntStateOf(0) }
     var lastWriteOperation by remember { mutableStateOf("自定义") }
 
+    // 结果弹窗状态
+    var showResultDialog by remember { mutableStateOf(value = false) }
+
     BackHandler {
         onDisconnectClick()
     }
@@ -133,20 +136,33 @@ fun ControlScreen(
         }
     }
 
+    // 写入结果监听
+    LaunchedEffect(writeResult) {
+        if ((writeResult is WriteResult.Success) || (writeResult is WriteResult.Error)) {
+            showResultDialog = true
+        }
+    }
+
+    fun dismissWriteResultDialog() {
+        showResultDialog = false
+        viewModel.clearWriteResult()
+    }
+
     Scaffold(
         topBar = {
             NiuTopAppBar(onSettingsClick = onSettingsClick)
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp) // 底部留出空间给非模态提示
+            ) {
             item {
                 val cardBrush = Brush.linearGradient(
                     colors = listOf(
@@ -222,45 +238,40 @@ fun ControlScreen(
                                         fontSize = 15.sp
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    detectedModel?.let { modelName ->
+                                    val statusBadgeText = when {
+                                        detectedModel?.startsWith("模拟", ignoreCase = true) == true -> detectedModel
+                                        connectionState == BLEConnectionState.READY -> "NIU Link 认证"
+                                        else -> detectedModel
+                                    }
+                                    statusBadgeText?.let { badgeText ->
                                         Row(
                                             modifier = Modifier
                                                 .background(
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                    if (badgeText.startsWith("模拟")) {
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    } else {
+                                                        NiuRed.copy(alpha = 0.15f)
+                                                    },
                                                     RoundedCornerShape(4.dp)
                                                 )
                                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                                         ) {
                                             Text(
-                                                modelName,
-                                                color = MaterialTheme.colorScheme.primary,
+                                                badgeText,
+                                                color = if (badgeText.startsWith("模拟")) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    NiuRed
+                                                },
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.ExtraBold
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                    }
-                                    if (connectionState == BLEConnectionState.READY) {
-                                        Row(
-                                            modifier = Modifier
-                                                .background(
-                                                    NiuRed.copy(alpha = 0.15f),
-                                                    RoundedCornerShape(4.dp)
-                                                )
-                                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                                        ) {
-                                            Text(
-                                                "NIU Link 认证",
-                                                color = NiuRed,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "设备地址: ${dev.address}",
+                                    text = "MAC: ${dev.address}",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
@@ -557,118 +568,6 @@ fun ControlScreen(
                                 }
                             }
 
-                            AnimatedVisibility(
-                                visible = writeResult != WriteResult.Idle,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    when (val res = writeResult) {
-                                        WriteResult.Writing -> {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(
-                                                        MaterialTheme.colorScheme.secondary.copy(
-                                                            alpha = 0.1f
-                                                        ), RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Refresh,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.secondary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    "指令发送链路已开启，请将移动设备靠近车辆...",
-                                                    fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(
-                                                        alpha = 0.8f
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        WriteResult.Success -> {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(
-                                                        SafeGreen.copy(alpha = 0.15f),
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.CheckCircle,
-                                                    contentDescription = null,
-                                                    tint = SafeGreen,
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Column {
-                                                    Text(
-                                                        "已写入【$lastWriteOperation】",
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = SafeGreen,
-                                                        fontSize = 14.sp
-                                                    )
-                                                    Text(
-                                                        "如果未生效，请重新启动车辆",
-                                                        fontSize = 11.sp,
-                                                        color = SafeGreen.copy(alpha = 0.9f)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        is WriteResult.Error -> {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(
-                                                        MaterialTheme.colorScheme.error.copy(
-                                                            alpha = 0.12f
-                                                        ), RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Warning,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(22.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Column {
-                                                    Text(
-                                                        "限速还原失败",
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.error,
-                                                        fontSize = 14.sp
-                                                    )
-                                                    Text(
-                                                        "错误详情: ${res.errorMsg}",
-                                                        fontSize = 11.sp,
-                                                        color = MaterialTheme.colorScheme.error.copy(
-                                                            alpha = 0.9f
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        else -> {}
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -843,13 +742,93 @@ fun ControlScreen(
                                             ),
                                             fontFamily = FontFamily.Monospace
                                         )
-                                    }
-                                }
-                            }
-                        }
+                    }
+                }
+            }
+        }
+            }
+                }
+            }
+        }
+
+        // 操作中：底部非模态加载提示
+        if (writeResult == WriteResult.Writing) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 32.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(
+                            "指令发射中，请靠近车辆...",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
     }
+    }
+
+    // 结果提醒弹窗
+    if (showResultDialog) {
+        val res = writeResult
+        AlertDialog(
+            onDismissRequest = { dismissWriteResultDialog() },
+            icon = {
+                Icon(
+                    imageVector = if (res is WriteResult.Success) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp),
+                    tint = if (res is WriteResult.Success) SafeGreen else MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(if (res is WriteResult.Success) "操作成功" else "写入失败")
+            },
+            text = {
+                Column {
+                    Text(
+                        if (res is WriteResult.Success) "已成功完成【$lastWriteOperation】指令写入。"
+                        else "指令执行未成功。",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (res is WriteResult.Error) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "详情: ${res.errorMsg}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "若未生效，请重启电动车电源验证。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { dismissWriteResultDialog() }) {
+                    Text("知道了", fontWeight = FontWeight.Bold)
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
 }
+

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "NIU Link Pro",
+    "address": "D0:8A:15:42:9C:01",
+    "rssi": -48
+  },
+  {
+    "name": "NIU Link MQi",
+    "address": "D0:8A:15:42:9C:02",
+    "rssi": -63
+  },
+  {
+    "name": "NIU-Gateway",
+    "address": "D0:8A:15:42:9C:03",
+    "rssi": -71
+  },
+  {
+    "name": "Mi Band",
+    "address": "E4:11:22:33:44:10",
+    "rssi": -56
+  },
+  {
+    "name": "BLE Sensor",
+    "address": "E4:11:22:33:44:11",
+    "rssi": -68
+  },
+  {
+    "name": "Unknown Device",
+    "address": "E4:11:22:33:44:12",
+    "rssi": -82
+  }
+]

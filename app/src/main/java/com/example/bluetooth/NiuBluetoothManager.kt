@@ -81,6 +81,7 @@ class NiuBluetoothManager(private val context: Context) {
 
     private var activeGatt: BluetoothGatt? = null
     private var writeCharacteristic: BluetoothGattCharacteristic? = null
+    private var simulationEnabled = false
 
     private var pendingLogCallback: ((Boolean, String) -> Unit)? = null
 
@@ -91,6 +92,11 @@ class NiuBluetoothManager(private val context: Context) {
             _connectionError.value = "连接超时，请靠近车辆后重试"
             _connectionState.value = BLEConnectionState.FAILED
             closeGattQuietly()
+        }
+    }
+    private val simulatedScanStopRunnable = Runnable {
+        if (simulationEnabled && _isScanning.value) {
+            _isScanning.value = false
         }
     }
 
@@ -162,10 +168,25 @@ class NiuBluetoothManager(private val context: Context) {
         }
     }
 
+    fun setSimulationEnabled(enabled: Boolean) {
+        if (simulationEnabled == enabled) return
+        if (_isScanning.value) {
+            stopScan()
+        }
+        _scannedDevices.value = emptyList()
+        simulationEnabled = enabled
+        cleanup()
+    }
+
     fun startScan() {
         if (_isScanning.value) return
 
         _scannedDevices.value = emptyList()
+
+        if (simulationEnabled) {
+            startSimulatedScan()
+            return
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) !=
@@ -199,6 +220,9 @@ class NiuBluetoothManager(private val context: Context) {
     fun stopScan() {
         if (!_isScanning.value) return
         _isScanning.value = false
+        mainHandler.removeCallbacks(simulatedScanStopRunnable)
+
+        if (simulationEnabled) return
 
         if (!hasBluetoothScanPermission()) {
             Log.e(TAG, "Missing Bluetooth scan permission while stopping scan")
@@ -218,6 +242,11 @@ class NiuBluetoothManager(private val context: Context) {
         stopScan()
         if (_connectionState.value != BLEConnectionState.DISCONNECTED) {
             cleanup()
+        }
+
+        if (simulationEnabled) {
+            connectSimulatedDevice(scannedDevice)
+            return
         }
 
         _connectedDevice.value = scannedDevice
@@ -268,6 +297,19 @@ class NiuBluetoothManager(private val context: Context) {
             cleanup()
         }
 
+        if (simulationEnabled) {
+            connectSimulatedDevice(
+                ScannedBleDevice(
+                    name = name,
+                    address = address,
+                    rssi = -55,
+                    device = null,
+                    isNiuLink = isNiuDeviceName(name)
+                )
+            )
+            return
+        }
+
         val device = bluetoothAdapter?.getRemoteDevice(address)
         if (device == null) {
             Log.e(TAG, "Cannot get remote device for address $address")
@@ -315,7 +357,18 @@ class NiuBluetoothManager(private val context: Context) {
         cleanup()
     }
 
+    fun clearWriteResult() {
+        if (_writeResult.value != WriteResult.Writing) {
+            _writeResult.value = WriteResult.Idle
+        }
+    }
+
     fun discoverServices() {
+        if (simulationEnabled) {
+            discoverSimulatedServices()
+            return
+        }
+
         val gatt = activeGatt
         if (gatt == null) {
             _connectionError.value = "蓝牙连接未建立，无法校验服务特征"
@@ -476,6 +529,15 @@ class NiuBluetoothManager(private val context: Context) {
         isWriteNoResponse: Boolean = false,
         onLogReady: (Boolean, String) -> Unit
     ) {
+        if (simulationEnabled) {
+            _writeResult.value = WriteResult.Writing
+            mainHandler.postDelayed({
+                _writeResult.value = WriteResult.Success
+                onLogReady(true, "模拟写入成功")
+            }, 450)
+            return
+        }
+
         val cleanHex = hexString.replace(" ", "").replace(":", "")
         val bytes = try {
             hexStringToByteArray(cleanHex)
@@ -570,6 +632,96 @@ class NiuBluetoothManager(private val context: Context) {
             133 -> "蓝牙系统连接异常，请关闭蓝牙后重试"
             else -> "蓝牙连接失败，请重新连接"
         }
+    }
+
+    private fun startSimulatedScan() {
+        _isScanning.value = true
+        _connectionError.value = null
+        mainHandler.postDelayed({
+            if (!simulationEnabled || !_isScanning.value) return@postDelayed
+            _scannedDevices.value = createSimulatedDevices()
+        }, 350)
+        mainHandler.postDelayed(simulatedScanStopRunnable, 1600)
+    }
+
+    private fun createSimulatedDevices(): List<ScannedBleDevice> {
+        return try {
+            val json = context.assets.open("simulated_ble_devices.json")
+                .bufferedReader()
+                .use { it.readText() }
+            val array = JSONArray(json)
+            List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                val name = item.getString("name")
+                ScannedBleDevice(
+                    name = name,
+                    address = item.getString("address"),
+                    rssi = item.getInt("rssi"),
+                    device = null,
+                    isNiuLink = isNiuDeviceName(name)
+                )
+            }.sortedWith(
+                compareByDescending<ScannedBleDevice> { it.isNiuLink }
+                    .thenByDescending { it.rssi }
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load simulated BLE devices", e)
+            fallbackSimulatedDevices()
+        }
+    }
+
+    private fun fallbackSimulatedDevices(): List<ScannedBleDevice> {
+        return listOf(
+            createSimulatedDevice("NIU Link Pro", "D0:8A:15:42:9C:01", -48),
+            createSimulatedDevice("NIU Link MQi", "D0:8A:15:42:9C:02", -63),
+            createSimulatedDevice("BLE Sensor", "E4:11:22:33:44:11", -68),
+            createSimulatedDevice("Unknown Device", "E4:11:22:33:44:12", -82)
+        )
+    }
+
+    private fun createSimulatedDevice(name: String, address: String, rssi: Int): ScannedBleDevice {
+        return ScannedBleDevice(
+            name = name,
+            address = address,
+            rssi = rssi,
+            device = null,
+            isNiuLink = isNiuDeviceName(name)
+        )
+    }
+
+    private fun connectSimulatedDevice(scannedDevice: ScannedBleDevice) {
+        _connectedDevice.value = scannedDevice
+        _connectionState.value = BLEConnectionState.CONNECTING
+        _connectionError.value = null
+        _writeResult.value = WriteResult.Idle
+        _detectedModel.value = null
+
+        mainHandler.postDelayed({
+            if (!simulationEnabled) return@postDelayed
+            _connectionState.value = BLEConnectionState.CONNECTED
+        }, 650)
+    }
+
+    private fun discoverSimulatedServices() {
+        val device = _connectedDevice.value
+        if (device?.isNiuLink != true) {
+            _connectionError.value = "当前车辆型号不支持"
+            _connectionState.value = BLEConnectionState.FAILED
+            return
+        }
+
+        _connectionError.value = null
+        _connectionState.value = BLEConnectionState.SERVICES_DISCOVERING
+        mainHandler.postDelayed({
+            if (!simulationEnabled) return@postDelayed
+            _detectedModel.value = "模拟 NIU Link"
+            _connectionState.value = BLEConnectionState.READY
+        }, 450)
+    }
+
+    private fun isNiuDeviceName(name: String): Boolean {
+        return name.startsWith("NIU Link", ignoreCase = true) ||
+            name.contains("NIU", ignoreCase = true)
     }
 
     private fun hexStringToByteArray(s: String): ByteArray {
