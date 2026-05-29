@@ -1,8 +1,8 @@
 package com.example.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -153,7 +154,13 @@ private fun SettingsSwitchRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            modifier = Modifier.scale(0.85f)
+            modifier = Modifier.scale(0.85f),
+            colors = SwitchDefaults.colors(
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+                uncheckedIconColor = MaterialTheme.colorScheme.surfaceVariant
+            )
         )
     }
 }
